@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+# Author: Shalabh Suman
+
+import os, glob
+import subprocess
+from pathlib import Path
+
+#conf = os.environ.get("conf")
+#configfile: conf
+#refGenome = config['refGenome']
+#nt = config['maxThreads']
+#gatkPath = config['gatkPath']
+#outputDir = config['outputDir']
+#inputDir = config['inputDir']
+
+
+gatkPath="/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.11.0/gatk"
+
+#gatkPath="/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.9.0/gatk"
+
+refGenome="/CGF/Resources/Data/genome/hg19_canonical_correct_chr_order.fa" 
+
+intervalFile="/DCEG/Projects/Exome/SequencingData/variant_scripts_V3_in_process/variant_intervals_beds/variant_calling_intervals_120430_HG19_ExomeV3_UTR_merged_padded250bp_merged_4000parts/120430_HG19_ExomeV3_UTR_merged_padded250bp_merged.intervals"
+
+inputDir="/home/sumans/Project_Git_Repos/variantCallingPipelineGermlineHC4/example_data/bam/"
+
+outputDir="/home/sumans/Project_Git_Repos/variantCallingPipelineGermlineHC4/output/"
+tempDir="/ttemp/"
+
+bamList = [f for f in os.listdir(inputDir) if f.endswith('.bam')]
+
+sampleList=[os.path.splitext(f)[0] for f in os.listdir(inputDir) if f.endswith('.bam')]
+
+#ds=`date "+%Y-%m-%d_%H%M%S"`
+
+
+
+rule all:
+    input:
+       	expand(outputDir + 'HC_gvcf/{dataset}.g.vcf.gz', dataset=sampleList),
+       	expand(outputDir + 'HC_gvcf/{dataset}.g.vcf.gz.tbi', dataset=sampleList),
+    	vcf = outputDir + 'HC_genotypeGvcf/project.vcf.gz',
+    	idx = outputDir + 'HC_genotypeGvcf/project.vcf.gz.tbi'
+
+
+rule HC_gvcf_calling:
+    input:
+        ref = refGenome,
+        interval =  intervalFile,
+        bam = inputDir + '{dataset}.bam',
+        bai = inputDir + '{dataset}.bam.bai'
+    output:
+    	gvcf = outputDir + 'HC_gvcf/{dataset}.g.vcf'
+    params:
+        e = gatkPath
+    shell:
+    	'java -jar {params.e} HaplotypeCaller -R {input.ref} -I {input.bam} -ERC GVCF -L {input.interval} -O {output.gvcf}'
+
+rule HC_compress_gvcfs:
+    input:
+        outputDir + 'HC_gvcf/{dataset}.g.vcf'
+    output:
+        outputDir + 'HC_gvcf/{dataset}.g.vcf.gz',
+        outputDir + 'HC_gvcf/{dataset}.g.vcf.gz.tbi'
+    shell:
+        'module load tabix, bgzip;'
+        'bgzip {input} && tabix -p vcf {input}.gz'
+
+
+rule HC_genomicsDBImport:
+    input: 
+    	gvcfList = expand(outputDir + "HC_gvcf/{dataset}.g.vcf.gz", dataset=sampleList),
+    	interval =  intervalFile
+    params:
+        e = gatkPath,
+        gvcfList_params = lambda wildcards, input:" -V ".join(input.gvcfList)
+    output:
+    	db = directory(outputDir + 'HC_db')
+    shell:
+    	'{params.e} --java-options "-Xmx4G" GenomicsDBImport -V {params.gvcfList_params} --genomicsdb-workspace-path {output.db} -L {input.interval}'
+    	
+rule HC_genotypeGVCFs:
+    input:
+    	ref = refGenome,
+        interval =  intervalFile,
+        db = directory(outputDir + 'HC_db')
+    output:
+    	vcf = outputDir + 'HC_genotypeGvcf/project.vcf.gz',
+    	idx = outputDir + 'HC_genotypeGvcf/project.vcf.gz.tbi'
+    params:
+        e = gatkPath
+    shell:
+    	'{params.e} --java-options "-Xmx4G" GenotypeGVCFs -R {input.ref} -V gendb://{input.db} -O {output.vcf} --tmp-dir=/ttemp'
+
+    	
