@@ -1,41 +1,62 @@
-
 #!/bin/bash
 #$ -S /bin/sh
 #$ -j y
 
-configFile=$1
+set -euo pipefail
+
+die() {
+    echo "ERROR: $* (status $?)" 1>&2
+    exit 1
+}
+
 if [ $# -eq 0 ]; then
-    echo "Config File is required. Please specify config file with full path"
+    echo "Please specify config file with full path."
+    exit 1
+else 
+    configFile=$1
+fi
+
+if [ ! -f "$configFile" ]; then
+    echo "Config file not found."
     exit 1
 fi
 
-source /etc/profile.d/modules.sh
-module load python3/3.6.3 sge
-#module load python3/3.5.1 sge
-#module load python3/3.7.0 sge
+# note that this will only work for simple, single-level yaml
+# this also requires a whitespace between the key and value pair in the config (except for the cluster command, which requires single or double quotes)
+snakeDir=$(awk '($0~/^snakePath/){print $2}' $configFile | sed "s/['\"]//g")
+logDir=$(awk '($0~/^logDir/){print $2}' $configFile | sed "s/['\"]//g") 
+# inDir=$(awk '($0~/^inputDir/){print $2}' $configFile | sed "s/['\"]//g") 
+outDir=$(awk '($0~/^outputDir/){print $2}' $configFile | sed "s/['\"]//g") 
+# tempDir=$(awk '($0~/^tempDir/){print $2}' $configFile | sed "s/['\"]//g")
+# refGenome=$(awk '($0~/^refGenome/){print $2}' $configFile | sed "s/['\"]//g")
+# refDir=${refGenome%/*}
+maxJobs=$(awk '($0~/^maxJobs/){print $2}' $configFile | sed "s/['\"]//g")
+clusterLine=$(awk '($0~/^clusterMode/){print $0}' $configFile | sed "s/\"/'/g")  # allows single or double quoting of the qsub command in the config file
+clusterMode='"'$(echo $clusterLine | awk -F\' '($0~/^clusterMode/){print $2}')'"'
 
-#unset module
+if [ ! -d "$logDir" ]; then
+    mkdir -p "$logDir" || die "mkdir ${logDir} failed"
+fi
 
-snakemake --version
+if [ ! -d "$outDir" ]; then
+    mkdir -p "$outDir" || die "mkdir ${outDir} failed"
+fi
 
-maxJobs=10
-queue=xlong.q
-
-scriptDir=/DCEG/CGF/Bioinformatics/Production/Shalabh/variantCallingPipelineGermlineHC4/scripts
-logDir=/DCEG/CGF/Bioinformatics/Production/Shalabh/variantCallingPipelineGermlineHC4/logs_ScatterGather_3/
-
-mkdir -p $logDir 2>/dev/null
-
-
-ds=`date "+%Y-%m-%d_%H%M%S"`
+DATE=$(date +"%Y%m%d%H%M")
+cd $outDir  # snakemake passes $PWD to singularity and binds it as the home directory, and then works relative to that path.
+# sing_arg='"'$(echo "-B ${inDir}:/input,${tempDir}:/scratch,${refDir}:/ref,${outDir}:/output,${execDir}:/exec")'"'
 
 
-#conf=$configFile snakemake -s ${scriptDir}/Snakefile_germline_variant_calling_HC --cluster "qsub -V -q $queue -j y -o $logDir" --jobs $maxJobs --latency-wait 300 &> $logDir"log.out."$ds
+cmd=""
+if [ "$clusterMode" == '"'"local"'"' ]; then
+    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_variant_calling_HC_ScatterGather --rerun-incomplete &> ${logDir}/log_${DATE}.out"
+elif [ "$clusterMode" = '"'"unlock"'"' ]; then  # put in a convenience unlock
+    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_variant_calling_HC_ScatterGather --unlock"
+else
+    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_variant_calling_HC_ScatterGather --rerun-incomplete --cluster ${clusterMode} --jobs $maxJobs --latency-wait 300 &> ${logDir}/log_${DATE}.out"
+    # --nt - keep temp files
+fi
 
+echo "Command run: $cmd"
+eval $cmd 
 
-
-#conf=$configFile snakemake -s ${scriptDir}/Snakefile_germline_variant_calling_HC_ScatterGather -p --rerun-incomplete --cluster "qsub -q $queue -pe by_node 10 -o $logDir -e $logDir" --jobs $maxJobs --latency-wait 300 &> $logDir"log.out."$ds
-
-#conf=$configFile snakemake -s ${scriptDir}/Snakefile_germline_variant_calling_HC --unlock 
-
-conf=$configFile snakemake -s ${scriptDir}/Snakefile_germline_variant_calling_HC_ScatterGather -p --rerun-incomplete --cluster "qsub -q $queue -pe by_node {threads} -o $logDir -e $logDir" --jobs $maxJobs --latency-wait 300 &> $logDir"log.out."$ds
