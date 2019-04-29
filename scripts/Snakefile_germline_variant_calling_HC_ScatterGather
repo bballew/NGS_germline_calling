@@ -1,44 +1,34 @@
 #!/usr/bin/env python3
-# Author: Shalabh Suman
+# Authors: Shalabh Suman, Bari Ballew
 
-import os, glob
-import subprocess
-from pathlib import Path
+import os
+# import glob
+# import subprocess
+# from pathlib import Path
 
+# reference the config file
 conf = os.environ.get("conf")
-#print (conf)
-#configfile: conf
-#configfile: "./config_CTRL.yaml"
-configfile: "./config.yaml"
+configfile: conf
+
+# import variables from the config file
 refGenome = config['refGenome']
 dictionaryFile = config['dictionaryFile']
 gatkPath = config['gatkPath']
 intervalFile = config['intervalFile']
-outputDir = config['outputDir']
-inputDir = config['inputDir']
+outDir = config['outputDir']
+inDir = config['inputDir']
 tempDir=config['tempDir']
 logDir = config['logDir']
 
-#refGenome="/CGF/Resources/Data/genome/hg19_canonical_correct_chr_order.fa"
-#dictionaryFile="/DCEG/Resources/Data/genome/hg19_canonical_correct_chr_order.dict"
+# read all *.bam filenames in input directory into list
+# assume all bams are indexed
+bamList = [f for f in os.listdir(inDir) if f.endswith('.bam')]
 
-#gatkPath="/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.11.0/gatk"
-#gatkPath="/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.9.0/gatk"
+# generate sampleList based on bam filenames
+sampleList = [os.path.splitext(f)[0] for f in bamList]
 
-#intervalFile="/DCEG/Projects/Exome/SequencingData/variant_scripts_V3_in_process/variant_intervals_beds/variant_calling_intervals_120430_HG19_ExomeV3_UTR_merged_padded250bp_merged_4000parts/120430_HG19_ExomeV3_UTR_merged_padded250bp_merged.intervals"
-
-#inputDir="/DCEG/CGF/Bioinformatics/Production/Shalabh/variantCallingPipelineGermlineHC4/example_data/bam/"
-
-#outputDir="/DCEG/CGF/Bioinformatics/Production/Shalabh/variantCallingPipelineGermlineHC4/output_ScatterGather_3/"
-
-#tempDir="/ttemp/"
-
-
-
-bamList = [f for f in os.listdir(inputDir) if f.endswith('.bam')]
-
-sampleList=[os.path.splitext(f)[0] for f in os.listdir(inputDir) if f.endswith('.bam')]
-
+# read in chromosome list from reference dict file (assumes the dict is already created)
+# consider getting this info from the original ref file?
 chromList = []
 with open(dictionaryFile) as f:
     next(f)
@@ -47,136 +37,238 @@ with open(dictionaryFile) as f:
         f2 = f1.split(":")[1]
         chromList.append(f2)
 
-#chromList = ['chr1', 'chr2', 'chr3', 'chr4', 'chr5']
-
-#ds=`date "+%Y-%m-%d_%H%M%S"`
-
-
-
 rule all:
     input:
-   		vcf = outputDir + 'HC_gatherVcf/build_final.vcf.gz',
-   		idx = outputDir + 'HC_gatherVcf/build_final.vcf.gz.tbi',
-   		vcf2 = outputDir + 'HC_gatherVcf/build_final_bcftools.vcf.gz',
-   		idx2 = outputDir + 'HC_gatherVcf/build_final_bcftools.vcf.gz.tbi'
-#   	expand(outputDir + 'HC_gvcf/{dataset}.g.vcf', dataset=sampleList),
-#      	expand(outputDir + 'HC_gvcf_compress/{dataset}.g.vcf.gz', dataset=sampleList),
-#      	expand(outputDir + 'HC_gvcf_compress/{dataset}.g.vcf.gz.tbi', dataset=sampleList),
-#       expand(outputDir + 'HC_genotypeGvcf/{chromosome}.vcf.gz', chromosome=chromList),
-#      	expand(outputDir + 'HC_genotypeGvcf/{chromosome}.vcf.gz.tbi', chromosome=chromList),
+        # expand(outDir + 'split_beds/{chrom}.bed', chrom=chromList),
+        outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz.tbi',
+        outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz.tbi'
+
+## use the following three rules to ensure ref is indexed:
+# rule bwa_index_ref:
+#     '''
+#     '''
+#     input:
+#         ref
+#     output:
+#         ref + '.amb',
+#         ref + '.ann',
+#         ref + '.bwt',
+#         ref + '.pac',
+#         ref + '.sa'
+#     params:
+#         f = refBindPath + refFile
+#     #singularity: 'shub://bballew/NGS_singularity_recipes:bwa_0-7-17'
+#     shell:
+#         'source /etc/profile.d/modules.sh; module load bwa/0.7.9a;'
+#         'bwa index -a bwtsw {params.f}'
+
+# rule fai_index_ref:
+#     '''
+#     '''
+#     input:
+#         ref
+#     output:
+#         ref + '.fai'
+#     params:
+#         f = refBindPath + refFile
+#     #singularity: 'shub://bballew/NGS_singularity_recipes:samtools_1-9'
+#     shell:
+#         'source /etc/profile.d/modules.sh; module load samtools/1.8;'
+#         'samtools faidx {params.f}'
+
+# rule dict_index_ref:
+#     '''
+#     '''
+#     input:
+#         ref
+#     output:
+#         refDir + '/' + refNoExt + '.dict'
+#     params:
+#         f = refBindPath + refFile,
+#         o = refBindPath + refNoExt + '.dict'
+#     #singularity: 'shub://bballew/NGS_singularity_recipes:picard_2-18-15'
+#     shell:
+#         'source /etc/profile.d/modules.sh; module load Picard/1.126;'
+#         'java -jar /bin/picard.jar CreateSequenceDictionary REFERENCE={params.f} OUTPUT={params.o}'
 
 
 rule HC_gvcf_calling:
+    '''Call gVCFs with GATK4
+    '''
     input:
         ref = refGenome,
         interval =  intervalFile,
-        bam = inputDir + '{dataset}.bam',
-        bai = inputDir + '{dataset}.bam.bai'
+        bam = inDir + '{sample}.bam',
+        bai = inDir + '{sample}.bam.bai'
     output:
-    	gvcf = outputDir + 'HC_gvcf/{dataset}.g.vcf'
+        gvcf = outDir + 'HaplotypeCaller/gvcf/{sample}.g.vcf'
     params:
         e = gatkPath
     threads: 5
+    # singularity: 'docker://broadinstitute/gatk'
     shell:
-    	'{params.e} --java-options "-Xmx4G" HaplotypeCaller \
-    	-R {input.ref} \
-    	-I {input.bam} \
-    	-ERC GVCF \
-    	-L {input.interval} \
-    	-O {output.gvcf} \
-    	-new-qual \
-    	-G StandardAnnotation \
-    	-G StandardHCAnnotation'
+        '{params.e}gatk --java-options "-Xmx4G" HaplotypeCaller \
+            -R {input.ref} \
+            -I {input.bam} \
+            -ERC GVCF \
+            -L {input.interval} \
+            -O {output.gvcf} \
+            -new-qual \
+            -G StandardAnnotation \
+            -G StandardHCAnnotation'
 
 rule HC_compress_gvcfs:
+    '''Zip and index gVCFs
+    '''
     input:
-        outputDir + 'HC_gvcf/{dataset}.g.vcf'
+        outDir + 'HaplotypeCaller/gvcf/{sample}.g.vcf'
     output:
-        vcf = outputDir + 'HC_gvcf_compress/{dataset}.g.vcf.gz',
-        idx = outputDir + 'HC_gvcf_compress/{dataset}.g.vcf.gz.tbi'
+        vcf = outDir + 'HaplotypeCaller/gvcf_compress/{sample}.g.vcf.gz',
+        idx = outDir + 'HaplotypeCaller/gvcf_compress/{sample}.g.vcf.gz.tbi'
     threads: 2
+    # singularity: '...'
     shell:
         'source /etc/profile.d/modules.sh; module load tabix bgzip;'
         'bgzip -c {input} > {output.vcf} && [[ -s {output.vcf} ]] && tabix -p vcf {output.vcf}'
 
-
 rule HC_genomicsDBImport:
+    '''why is flag needed here?
+    '''
     input: 
-    	gvcfList = expand(outputDir + "HC_gvcf_compress/{dataset}.g.vcf.gz", dataset=sampleList)
-#    	gvcfList = expand(outputDir + "HC_gvcf/{dataset}.g.vcf", dataset=sampleList)
-#    	interval =  intervalFile
+        gvcfList = expand(outDir + "HaplotypeCaller/gvcf_compress/{sample}.g.vcf.gz", sample=sampleList)
     output:
-    	db = directory(outputDir + 'HC_DBImport/HC_db_{chromosome}'),
-    	flag = touch(outputDir + 'HC_DBImport/genomicsDBImport_{chromosome}.done')
+        db = directory(outDir + 'HaplotypeCaller/DBImport/{chrom}')#,
+        # flag = touch(outDir + 'HC_DBImport/genomicsDBImport_{chrom}.done')
     params:
         e = gatkPath,
-        gvcfList_params = lambda wildcards, input:" -V ".join(input.gvcfList),
-        interval = '{chromosome}'
-    log:
-        outputDir + 'logs/HC_DBImport/{chromosome}.log'
+        gvcfList = lambda wildcards, input:" -V ".join(input.gvcfList),
+        interval = '{chrom}'
+    # log:
+    #     outDir + 'logs/DBImport/{chrom}.log'
     threads: 10
     shell:
-    	'{params.e} --java-options "-Xmx4G" GenomicsDBImport -V {params.gvcfList_params} --genomicsdb-workspace-path {output.db} -L {params.interval}'
-    	
+        '{params.e}gatk --java-options "-Xmx4G" GenomicsDBImport -V {params.gvcfList} --genomicsdb-workspace-path {output.db} -L {params.interval}'
+
 rule HC_genotypeGVCFs:
+    '''
+    '''
     input:
-    	ref = refGenome,
+        ref = refGenome,
         interval =  intervalFile,
-        db = directory(outputDir + 'HC_DBImport/HC_db_{chromosome}'),
-        flag = rules.HC_genomicsDBImport.output.flag
+        db = directory(outDir + 'HaplotypeCaller/DBImport/{chrom}')#,
+        # flag = outDir + 'HC_DBImport/genomicsDBImport_{chrom}.done' # rules.HC_genomicsDBImport.output.flag
     output:
-    	vcf = outputDir + 'HC_genotypeGvcf/{chromosome}.vcf.gz',
-    	idx = outputDir + 'HC_genotypeGvcf/{chromosome}.vcf.gz.tbi'
+        vcf = outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz',
+        idx = outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz.tbi'
     params:
         e = gatkPath
     threads: 5
     shell:
-    	'[[ -f {input.flag} ]] && \
-    	{params.e} --java-options "-Xmx4G" GenotypeGVCFs \
-    	-R {input.ref} \
-    	-V gendb://{input.db} \
-    	-O {output.vcf} \
-    	--tmp-dir=/ttemp \
-    	-new-qual -stand-call-conf 30 \
-    	-G StandardAnnotation \
-    	-G StandardHCAnnotation'
-    	
+        #'[[ -f {input.flag} ]] && \
+        '{params.e}gatk --java-options "-Xmx4G" GenotypeGVCFs \
+            -R {input.ref} \
+            -V gendb://{input.db} \
+            -O {output.vcf} \
+            --tmp-dir=/ttemp \
+            -new-qual -stand-call-conf 30 \
+            -G StandardAnnotation \
+            -G StandardHCAnnotation'
+        
 rule HC_gatherVCFs_gatk:
-	input:
-		vcfList = expand(outputDir + 'HC_genotypeGvcf/{chromosome}.vcf.gz', chromosome=chromList)
-	output:
-		projectVCF = protected(outputDir + 'HC_gatherVcf/build_final.vcf.gz')
-	params:
-		e = gatkPath,
-		vcfList_params = lambda wildcards, input:" -I ".join(input.vcfList)
-	threads: 10
-	shell:
-		'{params.e} --java-options "-Xmx4G" GatherVcfsCloud -I {params.vcfList_params} -O {output.projectVCF} && [[ -s {output.projectVCF} ]]'
-		
-rule HC_indexFinalVcf:
-	input:
-		vcf = rules.HC_gatherVCFs_gatk.output.projectVCF
-	output:
-		idx = protected(outputDir + 'HC_gatherVcf/build_final.vcf.gz.tbi'),
-		flag = touch(outputDir + 'variant_calling_gatk.done')
-	threads: 5
-	shell:
-		'source /etc/profile.d/modules.sh;'
-		'module load tabix;'
-		'tabix -p vcf {input.vcf}'
-		
+    '''
+    '''
+    input:
+        vcfList = expand(outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz', chrom=chromList)
+    output:
+        projectVCF = protected(outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz')
+    params:
+        e = gatkPath,
+        vcfList_params = lambda wildcards, input:" -I ".join(input.vcfList)
+    threads: 10
+    shell:
+        '{params.e}gatk --java-options "-Xmx4G" GatherVcfsCloud -I {params.vcfList_params} -O {output.projectVCF}'
+        
 rule HC_gatherVCFs_bcftools:
-	input:
-		vcfList = expand(outputDir + 'HC_genotypeGvcf/{chromosome}.vcf.gz', chromosome=chromList)
-	output:
-		projectVCF = outputDir + 'HC_gatherVcf/build_final_bcftools.vcf.gz',
-		projectIDX = outputDir + 'HC_gatherVcf/build_final_bcftools.vcf.gz.tbi',
-		flag = touch(outputDir + 'variant_calling_bcftools.done')
-	params:
-		e = gatkPath
-#		vcfList_params = input.vcfList
-	threads: 5
-	shell:
-		'source /etc/profile.d/modules.sh; module load bcftools tabix; bcftools concat {input.vcfList} -Oz -o {output.projectVCF} && [[ -s {output.projectVCF} ]] && tabix -p vcf {output.projectVCF}'
+    '''
+    '''
+    input:
+        vcfList = expand(outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz', chrom=chromList)
+    output:
+        projectVCF = protected(outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz')
+    threads: 5
+    shell:
+        'source /etc/profile.d/modules.sh; module load bcftools tabix;'
+        'bcftools concat {input.vcfList} -Oz -o {output.projectVCF}'
 
-    	
+rule HC_indexVcfs:
+    '''
+    '''
+    input:
+        vcf1 = outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz',
+        vcf2 = outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz'
+    output:
+        idx1 = protected(outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz.tbi'),
+        idx2 = protected(outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz.tbi')
+    threads: 5
+    shell:
+        'source /etc/profile.d/modules.sh; module load tabix;'
+        'tabix -p vcf {input.vcf1};'
+        'tabix -p vcf {input.vcf2}'
+
+# rule split_bed_file:
+#     input:
+#         intervalFile
+#     output:
+#         outDir + 'split_beds/{chrom}.bed'
+#     shell:
+#         'source /etc/profile.d/modules.sh; module load bedtools;'
+#         'grep {wildcards.chrom} {input} > {output}'
+
+# rule DV_make_examples:
+#     '''
+#     "consumes reads and the reference genome to create TensorFlow
+#     examples for evaluation with our deep learning models"
+
+#     --regions option: 
+#         - Can we run over each chromosome individually,
+#         to provide parallelization, rather than using shards?
+#         - Would we want to only call over the exome bed file?
+#         - Could we subset that by chrom in a rule and provide 
+#         the output to parallelize?
+#
+#     --parallel, --task, N_SHARDS - all refer to sharded files,
+#     which may be obviated by splitting on chrom.  downside?
+#
+#     safe to assume always gvcf, or should this be an option??
+#     '''
+#     input:
+#         ref = refGenome,
+#         bam = inDir + '{sample}.bam',
+#         bai = inDir + '{sample}.bam.bai',
+#         bed = outDir + 'split_beds/{chrom}.bed'
+#     output:
+#         ex = outDir + 'deepVariant/TFexamples/{chrom}_{sample}.examples.tfrecord.gz',
+#         gvcf = outDir + 'deepVariant/TFexamples/{chrom}_{sample}.gvcf.tfrecord.gz'
+#     params:
+#         mode = 'calling'
+#     shell:
+#         'source /etc/profile.d/modules.sh; module load deepvariant/0.5.2 parallel/20180322;'
+#         'make_examples --mode {params.mode} --ref {input.ref} --reads {input.bam} --regions {input.bed} --examples {output.ex} --gvcf {output.gvcf}'
+# can --regions take a bed file?  documentation only discusses strings.
+
+# rule DV_call_variants:
+#     input:
+#     output:
+#     shell:
+
+# "call_variants \
+#  --outfile \"${DEEPVARIANT_DIR}/${BASE_NAME}.cvo.tfrecord-0000${SHARD_NUM}-of-0000${N_SHARDS}.gz\" \
+#  --examples \"${DEEPVARIANT_DIR}/${BASE_NAME}.examples.tfrecord-0000${SHARD_NUM}-of-0000${N_SHARDS}.gz\" \
+#  --checkpoint \"${MODEL}\" \
+#  --batch_size 32"
+
+# rule DV_postprocess_variants:
+#     input:
+#     output:
+#     shell:
+#         
