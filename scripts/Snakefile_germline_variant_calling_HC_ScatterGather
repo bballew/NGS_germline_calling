@@ -10,7 +10,11 @@ configfile: conf
 
 # import variables from the config file
 refGenome = config['refGenome']
-dictionaryFile = config['dictionaryFile']
+refFile = os.path.basename(ref)
+refDir = os.path.dirname(ref)
+refNoExt = os.path.splitext(refFile)[0]
+dictionaryFile = refDir + '/' + refNoExt + '.dict'
+# dictionaryFile = config['dictionaryFile']
 gatkPath = config['gatkPath']
 intervalFile = config['intervalFile']
 bedFile = config['bedFile']
@@ -126,6 +130,13 @@ rule HC_gvcf_calling:
     '''
     input:
         ref = refGenome,
+        i1 = refGenome + '.amb',
+        i2 = refGenome + '.ann',
+        i3 = refGenome + '.bwt',
+        i4 = refGenome + '.pac',
+        i5 = refGenome + '.sa',
+        i6 = refGenome + '.fai',
+        i7 = dictionaryFile,
         interval =  intervalFile,
         bam = inDir + '{sample}.bam',
         bai = inDir + '{sample}.bam.bai'
