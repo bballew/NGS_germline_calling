@@ -10,8 +10,8 @@ configfile: conf
 
 # import variables from the config file
 refGenome = config['refGenome']
-refFile = os.path.basename(ref)
-refDir = os.path.dirname(ref)
+refFile = os.path.basename(refGenome)
+refDir = os.path.dirname(refGenome)
 refNoExt = os.path.splitext(refFile)[0]
 dictionaryFile = refDir + '/' + refNoExt + '.dict'
 # dictionaryFile = config['dictionaryFile']
@@ -448,53 +448,63 @@ rule DV_postprocess_variants:
         #         --nonvariant_site_tfrecord_path {input.gvcf} \
         #         --gvcf_outfile {output.gvcf}')
 
+rule DV_index_vcfs:
+    '''Index VCFs
+    '''
+    input:
+        outDir + 'deepVariant/postprocess_variants/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz' if useShards else outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{sample}_variants.vcf.gz'
+    output:
+        outDir + 'deepVariant/postprocess_variants/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz.tbi' if useShards else outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{sample}_variants.vcf.gz.tbi'
+    threads: 2
+    # singularity: '...'
+    shell:
+        'source /etc/profile.d/modules.sh; module load tabix;'
+        'tabix -p vcf {input}'
+
+
+rule DV_index_gvcfs:
+    '''Index gVCFs
+    '''
+    input:
+        outDir + 'deepVariant/postprocess_variants/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz' if useShards else outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz'
+    output:
+        outDir + 'deepVariant/postprocess_variants/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz.tbi' if useShards else outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz.tbi'
+    threads: 2
+    # singularity: '...'
+    shell:
+        'source /etc/profile.d/modules.sh; module load tabix;'
+        'tabix -p vcf {input}'
+
 rule DV_concat_vcfs:
     '''
-    Each shard has it's own set of VCF headers.  best to use bcftools/gatk?
-
-    use zcat or bcftools or gatk?
-
     You can just cat shards to merge - 
     https://github.com/google/deepvariant/issues/113
     '''
     input:
-        vcf = expand(outDir + 'deepVariant/postprocess_variants/vcfs/{{sample}}_record-{shards}-of-' + maxShards + '.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{{sample}}_variants.vcf.gz', chrom=chromList)
+        vcf = expand(outDir + 'deepVariant/postprocess_variants/vcfs/{{sample}}_record-{shards}-of-' + maxShards + '.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{{sample}}_variants.vcf.gz', chrom=chromList),
+        idx = expand(outDir + 'deepVariant/postprocess_variants/vcfs/{{sample}}_record-{shards}-of-' + maxShards + '.vcf.gz.tbi', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{{sample}}_variants.vcf.gz.tbi', chrom=chromList)
     output:
         outDir + 'deepVariant/concat/vcfs/{sample}_variants.vcf'
     shell:
-        'zcat {input} > {output}'
+        'source /etc/profile.d/modules.sh; module load bcftools;'
+        'bcftools concat -a {input.vcf} | sort -k1,1 -k2,2n > {output}'
+        # 'zcat {input} > {output}'
 
 rule DV_concat_gvcfs:
     '''
-    Each shard has it's own set of VCF headers.  best to use bcftools/gatk?
-
-    use zcat or bcftools or gatk?
-
     You can just cat shards to merge - 
     https://github.com/google/deepvariant/issues/113
     '''
     input:
-        vcf = expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{{sample}}_record-{shards}-of-' + maxShards + '.g.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{{sample}}_variants.g.vcf.gz', chrom=chromList)
+        vcf = expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{{sample}}_record-{shards}-of-' + maxShards + '.g.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{{sample}}_variants.g.vcf.gz', chrom=chromList),
+        idx = expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{{sample}}_record-{shards}-of-' + maxShards + '.g.vcf.gz.tbi', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{{sample}}_variants.g.vcf.gz.tbi', chrom=chromList)
     output:
         outDir + 'deepVariant/concat/gvcfs/{sample}_variants.g.vcf'
     shell:
-        'zcat {input} > {output}'
+        'source /etc/profile.d/modules.sh; module load bcftools;'
+        'bcftools concat -a {input.vcf} | sort -k1,1 -k2,2n > {output}'
+        # 'zcat {input} > {output}'
 
-
-
-
-#     rule DV_index_gvcfs:
-#         '''Index gVCFs
-#         '''
-#         input:
-#             outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}.g.vcf.gz'
-#         output:
-#             idx = outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}.g.vcf.gz.tbi'
-#         threads: 2
-#         # singularity: '...'
-#         shell:
-#             'source /etc/profile.d/modules.sh; module load tabix;'
-#             'tabix -p vcf {input}'
 
 
 #     rule merge_gvcfs:
