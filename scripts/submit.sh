@@ -46,11 +46,11 @@ cd $outDir  # snakemake passes $PWD to singularity and binds it as the home dire
 
 cmd=""
 if [ "$clusterMode" == '"'"local"'"' ]; then
-    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_variant_calling_HC_ScatterGather --config dt=${DATE} --rerun-incomplete &> ${logDir}/log_${DATE}.out"
+    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_snv_calling --config dt=${DATE} --rerun-incomplete &> ${logDir}/log_${DATE}.out"
 elif [ "$clusterMode" = '"'"unlock"'"' ]; then  # put in a convenience unlock
-    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_variant_calling_HC_ScatterGather --unlock"
+    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_snv_calling --unlock"
 else
-    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_variant_calling_HC_ScatterGather --config dt=${DATE} --rerun-incomplete --cluster ${clusterMode} --jobs $maxJobs --latency-wait 300 &> ${logDir}/log_${DATE}.out"
+    cmd="conf=$configFile snakemake -p -s ${snakeDir}/Snakefile_germline_snv_calling --config dt=${DATE} --rerun-incomplete --cluster ${clusterMode} --jobs $maxJobs --latency-wait 300 &> ${logDir}/log_${DATE}.out"
     # --nt - keep temp files
 fi
 
