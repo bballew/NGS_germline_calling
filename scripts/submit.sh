@@ -26,11 +26,7 @@ fi
 # this also requires a whitespace between the key and value pair in the config (except for the cluster command, which requires single or double quotes)
 snakeDir=$(awk '($0~/^snakePath/){print $2}' $configFile | sed "s/['\"]//g")
 logDir=$(awk '($0~/^logDir/){print $2}' $configFile | sed "s/['\"]//g") 
-# inDir=$(awk '($0~/^inputDir/){print $2}' $configFile | sed "s/['\"]//g") 
 outDir=$(awk '($0~/^outputDir/){print $2}' $configFile | sed "s/['\"]//g") 
-# tempDir=$(awk '($0~/^tempDir/){print $2}' $configFile | sed "s/['\"]//g")
-# refGenome=$(awk '($0~/^refGenome/){print $2}' $configFile | sed "s/['\"]//g")
-# refDir=${refGenome%/*}
 maxJobs=$(awk '($0~/^maxJobs/){print $2}' $configFile | sed "s/['\"]//g")
 clusterLine=$(awk '($0~/^clusterMode/){print $0}' $configFile | sed "s/\"/'/g")  # allows single or double quoting of the qsub command in the config file
 clusterMode='"'$(echo $clusterLine | awk -F\' '($0~/^clusterMode/){print $2}')'"'

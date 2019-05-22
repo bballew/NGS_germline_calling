@@ -1,6 +1,27 @@
 #!/usr/bin/env python3
 # Authors: Shalabh Suman, Bari Ballew
 
+####################run on 72 CTRL WES samples and on 2 syndip WGS samples
+
+'''Joint variant calling with GATK HaplotypeCaller and Google DeepVariant.
+
+Notes:
+    This pipeline is for use with the production germline pipeline.
+    Therefore, some things are assumed, e.g. that input bams are indexed,
+    that the reference genome is appropriately indexed, etc.  The pipeline
+    will halt if these assumptions are not true, but there are no rules
+    to perform these tasks.
+
+Input:
+    Customized config.yaml, sorted/indexed bams
+
+Output:
+    Merged multi-sample VCFs, one called with HaplotypeCaller, and one
+    called with DeepVariant
+
+'''
+
+
 import os
 import glob
 
@@ -10,11 +31,6 @@ configfile: conf
 
 # import variables from the config file
 refGenome = config['refGenome']
-refFile = os.path.basename(refGenome)
-refDir = os.path.dirname(refGenome)
-refNoExt = os.path.splitext(refFile)[0]
-dictionaryFile = refDir + '/' + refNoExt + '.dict'
-# dictionaryFile = config['dictionaryFile']
 gatkPath = config['gatkPath']
 intervalFile = config['intervalFile']
 bedFile = config['bedFile']
@@ -30,18 +46,22 @@ if useShards:
     s = list(range(numShards))
     shardsList = ["%05d" % n for n in s]
 
-# import command line config
+# derive additional refgenome variables
+refFile = os.path.basename(refGenome)
+refDir = os.path.dirname(refGenome)
+refNoExt = os.path.splitext(refFile)[0]
+dictionaryFile = refDir + '/' + refNoExt + '.dict'
+
+# set a datetime stamp for GATK DBImport step
 dt = str(config['dt'])
 
-# read all *.bam filenames in input directory into list
-# assume all bams are indexed
+# read all *.bam filenames in input directory into list (assume bams are indexed)
 bamList = [f for f in os.listdir(inDir) if f.endswith('.bam')]
 
 # generate sampleList based on bam filenames
 sampleList = [os.path.splitext(f)[0] for f in bamList]
 
 # read in chromosome list from reference dict file (assumes the dict is already created)
-# consider getting this info from the original ref file?
 chromList = []
 with open(dictionaryFile) as f:
     next(f)
@@ -66,66 +86,16 @@ report: 'report/workflow.rst'
 
 rule all:
     input:
-        expand(outDir + 'deepVariant/concat/vcfs/{sample}_variants.vcf', sample=sampleList),
-        expand(outDir + 'deepVariant/concat/gvcfs/{sample}_variants.g.vcf', sample=sampleList),
-        # expand(outDir + 'deepVariant/postprocess_variants/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz', sample=sampleList, shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{sample}.vcf.gz', chrom=chromList, sample=sampleList),
-        # expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz', sample=sampleList, shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}.g.vcf.gz', chrom=chromList, sample=sampleList),
-        outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz.tbi',
-        outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz.tbi'
-
-## use the following three rules to ensure ref is indexed:
-# rule bwa_index_ref:
-#     '''
-#     '''
-#     input:
-#         ref
-#     output:
-#         ref + '.amb',
-#         ref + '.ann',
-#         ref + '.bwt',
-#         ref + '.pac',
-#         ref + '.sa'
-#     params:
-#         f = refBindPath + refFile
-#     #singularity: 'shub://bballew/NGS_singularity_recipes:bwa_0-7-17'
-#     shell:
-#         'source /etc/profile.d/modules.sh; module load bwa/0.7.9a;'
-#         'bwa index -a bwtsw {params.f}'
-
-# rule fai_index_ref:
-#     '''
-#     '''
-#     input:
-#         ref
-#     output:
-#         ref + '.fai'
-#     params:
-#         f = refBindPath + refFile
-#     #singularity: 'shub://bballew/NGS_singularity_recipes:samtools_1-9'
-#     shell:
-#         'source /etc/profile.d/modules.sh; module load samtools/1.8;'
-#         'samtools faidx {params.f}'
-
-# rule dict_index_ref:
-#     '''
-#     '''
-#     input:
-#         ref
-#     output:
-#         refDir + '/' + refNoExt + '.dict'
-#     params:
-#         f = refBindPath + refFile,
-#         o = refBindPath + refNoExt + '.dict'
-#     #singularity: 'shub://bballew/NGS_singularity_recipes:picard_2-18-15'
-#     shell:
-#         'source /etc/profile.d/modules.sh; module load Picard/1.126;'
-#         'java -jar /bin/picard.jar CreateSequenceDictionary REFERENCE={params.f} OUTPUT={params.o}'
+        outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz.tbi',
+        outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz.tbi',
+        expand(outDir + 'deepVariant/called/vcfs/{sample}_variants.vcf.gz', sample=sampleList),
+        outDir + 'deepVariant/genotyped/build_final.vcf.gz.tbi'
 
 #######################################################################################################################
 ################################################ GATK HAPLOTYPE CALLER ################################################
 #######################################################################################################################
 
-rule HC_gvcf_calling:
+rule HC_call_variants:
     '''Call gVCFs with GATK4
     '''
     input:
@@ -141,7 +111,7 @@ rule HC_gvcf_calling:
         bam = inDir + '{sample}.bam',
         bai = inDir + '{sample}.bam.bai'
     output:
-        gvcf = outDir + 'HaplotypeCaller/gvcf/{sample}.g.vcf'
+        gvcf = outDir + 'HaplotypeCaller/called/{sample}.g.vcf'
     params:
         e = gatkPath
     threads: 5
@@ -161,20 +131,18 @@ rule HC_compress_gvcfs:
     '''Zip and index gVCFs
     '''
     input:
-        outDir + 'HaplotypeCaller/gvcf/{sample}.g.vcf'
+        outDir + 'HaplotypeCaller/called/{sample}.g.vcf'
     output:
-        vcf = outDir + 'HaplotypeCaller/gvcf_compress/{sample}.g.vcf.gz',
-        idx = outDir + 'HaplotypeCaller/gvcf_compress/{sample}.g.vcf.gz.tbi'
+        outDir + 'HaplotypeCaller/called/{sample}.g.vcf.gz',
+        outDir + 'HaplotypeCaller/called/{sample}.g.vcf.gz.tbi'
     threads: 2
     # singularity: '...'
     shell:
         'source /etc/profile.d/modules.sh; module load tabix bgzip;'
-        'bgzip -c {input} > {output.vcf};'
-        'tabix -p vcf {output.vcf}'
+        'bgzip {input}; tabix -p vcf {input}.gz'
 
 rule HC_genomicsDBImport:
-    '''
-    Split samples by chromosome
+    '''Split samples by chromosome
 
     The output of this step includes some files that are in subdirectories
     with unpredictable names.  I've attempted to include them in the input
@@ -187,19 +155,17 @@ rule HC_genomicsDBImport:
     DBImport finds that the workspace path already exists (even though it
     seems empty?).  Removing the directory just prior to running DBImport
     seems to solve this problem, but will be problematic on resuming the 
-    pipeline.  Added a datetime stamp to the dir to help address this.
+    pipeline.  Added a datetime stamp (dt) to the dir to help address this.
     However, this datetime stamp will need to be overriden if the pipeline
     is stopped and then resumed prior to completion of rule HC_genotypeGVCFs.
     '''
     input: 
-        gvcfList = expand(outDir + "HaplotypeCaller/gvcf_compress/{sample}.g.vcf.gz", sample=sampleList)
+        gvcfList = expand(outDir + "HaplotypeCaller/called/{sample}.g.vcf.gz", sample=sampleList)
     output:
         o1 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/vcfheader.vcf',
         o2 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/vidmap.json',
         o3 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/callset.json',
-        o4 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/__tiledb_workspace.tdb'#,
-        # o5 = get_DBImport_path1,
-        # o6 = get_DBImport_path2
+        o4 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/__tiledb_workspace.tdb'
     params:
         e = gatkPath,
         gvcfList = lambda wildcards, input:" -V ".join(input.gvcfList),
@@ -209,8 +175,8 @@ rule HC_genomicsDBImport:
     shell:
         'rm -r {params.db}; {params.e}gatk --java-options "-Xmx4G" GenomicsDBImport -V {params.gvcfList} --genomicsdb-workspace-path {params.db} -L {params.interval}'
 
-rule HC_genotypeGVCFs:
-    '''
+rule HC_genotype_gvcfs:
+    '''Joint genotyping
     '''
     input:
         ref = refGenome,
@@ -222,8 +188,8 @@ rule HC_genotypeGVCFs:
         o5 = get_DBImport_path1,
         o6 = get_DBImport_path2
     output:
-        vcf = outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz',
-        idx = outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz.tbi'
+        vcf = outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz',
+        idx = outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz.tbi'
     params:
         e = gatkPath,
         db = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}'
@@ -237,17 +203,16 @@ rule HC_genotypeGVCFs:
             -new-qual -stand-call-conf 30 \
             -G StandardAnnotation \
             -G StandardHCAnnotation'
-            # GenomicsDB workspace gendb:///DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/HaplotypeCaller/DBImport/chrM does not exist
         
-rule HC_gatherVCFs_gatk:
+rule HC_concat_vcfs_gatk:
     '''
     Why both gatk and bcftools (below)?  Wen says Shalabh
     was just comparing.  Compare and make a decision?
     '''
     input:
-        vcfList = expand(outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz', chrom=chromList)
+        vcfList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz', chrom=chromList)
     output:
-        projectVCF = protected(outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz')
+        projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz')
     params:
         e = gatkPath,
         vcfList_params = lambda wildcards, input:" -I ".join(input.vcfList)
@@ -255,27 +220,27 @@ rule HC_gatherVCFs_gatk:
     shell:
         '{params.e}gatk --java-options "-Xmx4G" GatherVcfsCloud -I {params.vcfList_params} -O {output.projectVCF}'
         
-rule HC_gatherVCFs_bcftools:
+rule HC_concat_vcfs_bcftools:
     '''
     '''
     input:
-        vcfList = expand(outDir + 'HaplotypeCaller/genotypeGvcf/{chrom}.vcf.gz', chrom=chromList)
+        vcfList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz', chrom=chromList)
     output:
-        projectVCF = protected(outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz')
+        projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz')
     threads: 5
     shell:
         'source /etc/profile.d/modules.sh; module load bcftools tabix;'
         'bcftools concat {input.vcfList} -Oz -o {output.projectVCF}'
 
-rule HC_indexVcfs:
+rule HC_index_vcfs:
     '''
     '''
     input:
-        vcf1 = outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz',
-        vcf2 = outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz'
+        vcf1 = outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz',
+        vcf2 = outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz'
     output:
-        idx1 = protected(outDir + 'HaplotypeCaller/gatherVcf/gatk/build_final.vcf.gz.tbi'),
-        idx2 = protected(outDir + 'HaplotypeCaller/gatherVcf/bcftools/build_final.vcf.gz.tbi')
+        idx1 = protected(outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz.tbi'),
+        idx2 = protected(outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz.tbi')
     threads: 5
     shell:
         'source /etc/profile.d/modules.sh; module load tabix;'
@@ -289,7 +254,14 @@ rule HC_indexVcfs:
 
 if not useShards:
     rule split_bed_file:
-        '''
+        '''Separates bed regions by chromosome.
+
+        If you're not assigning a number of shards by which to divide
+        and parallelize, then the pipeline will parallelize by chrom.
+        To do this, we take the bed file (e.g. exome capture region)
+        and split the regions by chromosome.  Subsequent steps are run
+        concurrently on each of the single-chromosome bed files.
+
         Note that grep exits with 0 if a match is found, 1 if no match,
         and 2 if error.  Snakemake looks for exit codes of 0 to determine
         that a job finished successfully.  No match is an acceptable outcome
@@ -307,7 +279,8 @@ if not useShards:
 
 
 rule DV_make_examples:
-    '''
+    '''Generate TF examples for evaluation with DV models
+
     TODO: using shards test works; need to try with chroms.
 
     "consumes reads and the reference genome to create TensorFlow
@@ -370,7 +343,7 @@ rule DV_make_examples:
                 --gvcf {params.gvcf} \
                 --task {wildcards.shards}')
         else:
-            shell('source /etc/profile.d/modules.sh; module load deepvariant/0.5.2; \
+            shell('source /etc/profile.d/modules.sh; module load deepvariant/0.5.2;\
             make_examples \
                 --mode {params.mode} \
                 --ref {input.ref} \
@@ -380,7 +353,7 @@ rule DV_make_examples:
                 --gvcf {output.gvcf}')
 
 rule DV_call_variants:
-    '''
+    '''Evaluate deep learning model to generate calls
     call_variants can accept sharded input but does not shard the output.
     At this step, the shards are re-combined.  If separating by chrom,
     the files remain split.
@@ -393,20 +366,11 @@ rule DV_call_variants:
     input:
         outDir + 'deepVariant/make_examples/{sample}.examples.tfrecord-{shards}-of-' + maxShards + '.gz' if useShards else outDir + 'deepVariant/make_examples/{chrom}part_{sample}.examples.tfrecord.gz'
     output:
-        outDir + 'deepVariant/call_variants/{sample}.variants.tfrecord-{shards}-of-' + maxShards + '.gz' if useShards else outDir + 'deepVariant/call_variants/{chrom}part_{sample}.variants.tfrecord.gz'
+        outDir + 'deepVariant/called/tf_records/{sample}.variants.tfrecord-{shards}-of-' + maxShards + '.gz' if useShards else outDir + 'deepVariant/called/tf_records/{chrom}part_{sample}.variants.tfrecord.gz'
     params:
         path = modelPath,
-        batch = '32' #,
-        # ex = outDir + 'deepVariant/make_examples/{sample}.examples.tfrecord@' + str(numShards) + '.gz' if useShards else ''
+        batch = '32'
     shell:
-    #     if useShards:
-    #         shell('source /etc/profile.d/modules.sh; module load deepvariant/0.5.2;\
-    #         call_variants \
-    #             --outfile {output} \
-    #             --examples {params.ex} \
-    #             --checkpoint {params.path} \
-    #             --batch_size {params.batch}')
-    #     else:
         'source /etc/profile.d/modules.sh; module load deepvariant/0.5.2;'
         'call_variants \
             --outfile {output} \
@@ -415,23 +379,17 @@ rule DV_call_variants:
             --batch_size {params.batch}'
 
 rule DV_postprocess_variants:
-    '''
+    '''Convert TFrecord calls to vcf and gvcf
     Intentionally NOT combining shards here to maintain parallelization.
     '''
     input:
-        var = outDir + 'deepVariant/call_variants/{sample}.variants.tfrecord-{shards}-of-' + maxShards + '.gz' if useShards else outDir + 'deepVariant/call_variants/{chrom}part_{sample}.variants.tfrecord.gz',
+        var = outDir + 'deepVariant/called/tf_records/{sample}.variants.tfrecord-{shards}-of-' + maxShards + '.gz' if useShards else outDir + 'deepVariant/called/tf_records/{chrom}part_{sample}.variants.tfrecord.gz',
         gvcf = outDir + 'deepVariant/make_examples/{sample}.gvcf.tfrecord-{shards}-of-' + maxShards + '.gz' if useShards else outDir + 'deepVariant/make_examples/{chrom}part_{sample}.gvcf.tfrecord.gz',
         ref = refGenome
     output:
-        vcf = outDir + 'deepVariant/postprocess_variants/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz' if useShards else outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{sample}_variants.vcf.gz',
-        gvcf = outDir + 'deepVariant/postprocess_variants/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz' if useShards else outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz'
-    # params:
-    #     var = outDir + 'deepVariant/call_variants/{sample}.variants.tfrecord@' + str(numShards) + '.gz' if useShards else '',
-    #     gvcf = outDir + 'deepVariant/make_examples/{sample}.gvcf.tfrecord@' + str(numShards) + '.gz' if useShards else '',
-    #     vcf_out = outDir + 'deepVariant/postprocess_variants/vcfs/{sample}_record@' + str(numShards) + '.vcf.gz' if useShards else '',
-    #     gvcf_out = outDir + 'deepVariant/postprocess_variants/gvcfs/{sample}_record@' + str(numShards) + '.g.vcf.gz' if useShards else ''
+        vcf = outDir + 'deepVariant/called/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz' if useShards else outDir + 'deepVariant/called/vcfs/{chrom}part_{sample}_variants.vcf.gz',
+        gvcf = outDir + 'deepVariant/called/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz' if useShards else outDir + 'deepVariant/called/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz'
     shell:
-        # if useShards:
         'source /etc/profile.d/modules.sh; module load deepvariant/0.5.2;'
         'postprocess_variants \
             --ref {input.ref} \
@@ -439,36 +397,14 @@ rule DV_postprocess_variants:
             --outfile {output.vcf} \
             --nonvariant_site_tfrecord_path {input.gvcf} \
             --gvcf_outfile {output.gvcf}'
-        # else:
-        #     shell('source /etc/profile.d/modules.sh; module load deepvariant/0.5.2;\
-        #     postprocess_variants \
-        #         --ref {input.ref} \
-        #         --infile {input.var} \
-        #         --outfile {output.vcf} \
-        #         --nonvariant_site_tfrecord_path {input.gvcf} \
-        #         --gvcf_outfile {output.gvcf}')
 
 rule DV_index_vcfs:
     '''Index VCFs
     '''
     input:
-        outDir + 'deepVariant/postprocess_variants/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz' if useShards else outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{sample}_variants.vcf.gz'
+        outDir + 'deepVariant/called/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz' if useShards else outDir + 'deepVariant/called/vcfs/{chrom}part_{sample}_variants.vcf.gz'
     output:
-        outDir + 'deepVariant/postprocess_variants/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz.tbi' if useShards else outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{sample}_variants.vcf.gz.tbi'
-    threads: 2
-    # singularity: '...'
-    shell:
-        'source /etc/profile.d/modules.sh; module load tabix;'
-        'tabix -p vcf {input}'
-
-
-rule DV_index_gvcfs:
-    '''Index gVCFs
-    '''
-    input:
-        outDir + 'deepVariant/postprocess_variants/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz' if useShards else outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz'
-    output:
-        outDir + 'deepVariant/postprocess_variants/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz.tbi' if useShards else outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz.tbi'
+        outDir + 'deepVariant/called/vcfs/{sample}_record-{shards}-of-' + maxShards + '.vcf.gz.tbi' if useShards else outDir + 'deepVariant/called/vcfs/{chrom}part_{sample}_variants.vcf.gz.tbi'
     threads: 2
     # singularity: '...'
     shell:
@@ -476,41 +412,90 @@ rule DV_index_gvcfs:
         'tabix -p vcf {input}'
 
 rule DV_concat_vcfs:
-    '''
+    '''Concatenate vcfs
     You can just cat shards to merge - 
     https://github.com/google/deepvariant/issues/113
     '''
     input:
-        vcf = expand(outDir + 'deepVariant/postprocess_variants/vcfs/{{sample}}_record-{shards}-of-' + maxShards + '.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{{sample}}_variants.vcf.gz', chrom=chromList),
-        idx = expand(outDir + 'deepVariant/postprocess_variants/vcfs/{{sample}}_record-{shards}-of-' + maxShards + '.vcf.gz.tbi', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/vcfs/{chrom}part_{{sample}}_variants.vcf.gz.tbi', chrom=chromList)
+        vcf = expand(outDir + 'deepVariant/called/vcfs/{{sample}}_record-{shards}-of-' + maxShards + '.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/called/vcfs/{chrom}part_{{sample}}_variants.vcf.gz', chrom=chromList),
+        idx = expand(outDir + 'deepVariant/called/vcfs/{{sample}}_record-{shards}-of-' + maxShards + '.vcf.gz.tbi', shards=shardsList) if useShards else expand(outDir + 'deepVariant/called/vcfs/{chrom}part_{{sample}}_variants.vcf.gz.tbi', chrom=chromList)
     output:
-        outDir + 'deepVariant/concat/vcfs/{sample}_variants.vcf'
+        outDir + 'deepVariant/called/vcfs/{sample}_variants.vcf.gz'
     shell:
         'source /etc/profile.d/modules.sh; module load bcftools;'
-        'bcftools concat -a {input.vcf} | sort -k1,1 -k2,2n > {output}'
-        # 'zcat {input} > {output}'
+        'bcftools concat -Ou -a {input.vcf} | bcftools sort -Oz -o {output}' # sort -k1,1 -k2,2n > {output}'
+
+rule DV_index_gvcfs:
+    '''Index gVCFs
+    '''
+    input:
+        outDir + 'deepVariant/called/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz' if useShards else outDir + 'deepVariant/called/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz'
+    output:
+        outDir + 'deepVariant/called/gvcfs/{sample}_record-{shards}-of-' + maxShards + '.g.vcf.gz.tbi' if useShards else outDir + 'deepVariant/called/gvcfs/{chrom}part_{sample}_variants.g.vcf.gz.tbi'
+    threads: 2
+    # singularity: '...'
+    shell:
+        'source /etc/profile.d/modules.sh; module load tabix;'
+        'tabix -p vcf {input}'
 
 rule DV_concat_gvcfs:
-    '''
+    '''Concatenate gvcfs
     You can just cat shards to merge - 
     https://github.com/google/deepvariant/issues/113
+
+    GLnexus works on uncompressed gvcfs and doesn't use index
     '''
     input:
-        vcf = expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{{sample}}_record-{shards}-of-' + maxShards + '.g.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{{sample}}_variants.g.vcf.gz', chrom=chromList),
-        idx = expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{{sample}}_record-{shards}-of-' + maxShards + '.g.vcf.gz.tbi', shards=shardsList) if useShards else expand(outDir + 'deepVariant/postprocess_variants/gvcfs/{chrom}part_{{sample}}_variants.g.vcf.gz.tbi', chrom=chromList)
+        vcf = expand(outDir + 'deepVariant/called/gvcfs/{{sample}}_record-{shards}-of-' + maxShards + '.g.vcf.gz', shards=shardsList) if useShards else expand(outDir + 'deepVariant/called/gvcfs/{chrom}part_{{sample}}_variants.g.vcf.gz', chrom=chromList),
+        idx = expand(outDir + 'deepVariant/called/gvcfs/{{sample}}_record-{shards}-of-' + maxShards + '.g.vcf.gz.tbi', shards=shardsList) if useShards else expand(outDir + 'deepVariant/called/gvcfs/{chrom}part_{{sample}}_variants.g.vcf.gz.tbi', chrom=chromList)
     output:
-        outDir + 'deepVariant/concat/gvcfs/{sample}_variants.g.vcf'
+        outDir + 'deepVariant/called/gvcfs/{sample}_variants.g.vcf'
     shell:
         'source /etc/profile.d/modules.sh; module load bcftools;'
-        'bcftools concat -a {input.vcf} | sort -k1,1 -k2,2n > {output}'
-        # 'zcat {input} > {output}'
+        'bcftools concat -Ou -a {input.vcf} | bcftools sort -Ov -o {output}' # sort -k1,1 -k2,2n > {output}'
 
+rule DV_create_manifest:
+    '''Create list of files for GLnexus to merge
+    '''
+    input:
+        expand(outDir + 'deepVariant/called/gvcfs/{sample}_variants.g.vcf', sample=sampleList)
+    output:
+        'deepVariant/called/gvcfs/manifest.txt'
+    shell:
+        'echo {input} | tr " " "\n" > {output}'
 
+rule DV_GLmerge_gvcfs:
+    '''Merge gvcfs into one multi-sample vcf
 
-#     rule merge_gvcfs:
-#         '''
-#         GLnexus
-#         '''
-#         input:
-#         output:
-#         shell:
+    The glnexus_cli executable consumes the gVCF files, and a three-column BED file giving the genomic ranges to analyze. For exomes, the BED file might contain the exome capture targets with some padding, while for WGS you can just give the full-length chromosomes.
+
+    Are shards are equivalent regions across samples?  Probably not?
+    Then can't parallelize by shard here.  Do we need parallelization?
+    If so, should we first split by region?
+
+    GLnexus outputs uncompressed bcf.
+
+    GLnexus creates a directory called "GLnexus.DB" in the working directory.  Track?
+
+    '''
+    input:
+        l = expand(outDir + 'deepVariant/called/gvcfs/{sample}_variants.g.vcf', sample=sampleList),
+        m = 'deepVariant/called/gvcfs/manifest.txt',
+        b = bedFile
+    output: 
+        temp(outDir + 'deepVariant/genotyped/build_final.bcf')
+    shell:
+        'source /etc/profile.d/modules.sh; module load glnexus/1.1.5 gcc;'
+        'glnexus_cli --config DeepVariant --bed {input.b} --list {input.m} > {output}'
+
+rule DV_compress_merged_vcfs:
+    '''
+    '''
+    input:
+        outDir + 'deepVariant/genotyped/build_final.bcf'
+    output:
+        gz = protected(outDir + 'deepVariant/genotyped/build_final.vcf.gz'),
+        tbi = protected(outDir + 'deepVariant/genotyped/build_final.vcf.gz.tbi')
+    shell:
+        'source /etc/profile.d/modules.sh; module load tabix bcftools;'
+        'bcftools view {input} | bgzip -c > {output.gz}; tabix -p vcf {output.gz}'
