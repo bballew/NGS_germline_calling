@@ -6,6 +6,26 @@
 This Pipeline will serve as a CGR WGS/WES Germline Variant Calling pipeline for internal or external projects.  The pipeline takes calibrated and indexed BAMs as input and generates two compressed and indexed multi-sample VCFs file as final output - one with DeepVariant calls and one with GATK4 HaplotypeCaller calls.  These VCFs can then be fed into the ensemble bcbio pipeline.
 
 
+## How to run:
+
+1. Copy `config.yaml` to your working directory and edit as necessary
+2. Copy `run_pipeline.sh` to your working directory and edit as necessary
+3. Run via `bash run_pipeline.sh`
+
+## Configuring the pipeline
+
+- Most options are self-explanatory
+- The pipeline will run over all *.bam files in the `inputDir`
+- `clusterMode` can be the cluster submission string (e.g. `qsub ...`) or a few keywords:
+  - `local` to run the pipeline on a single machine
+  - `unlock` to unlock the working directory (may be needed if snakemake exited unexpectedly - see snakemake docs for details)
+- `useShards` is a boolean to allow parallelization of DeepVariant over shards (e.g. if numShards=10, then each "shard" will contain 10% of the data) or over chromosomes
+- `modelPath` has two options provided by DeepVariant, /opt/wgs/model.ckpt or /opt/wes/model.ckpt for WGS or WES, respectively
+
+
+------------------------------------------------
+
+
 ## To do:
 
 - Compare GATK and bcftools for concatenation of HaplotypeCaller VCFs and choose one
@@ -20,12 +40,6 @@ This Pipeline will serve as a CGR WGS/WES Germline Variant Calling pipeline for 
 - Consider how best to integrate with upstream production pipeline, e.g. merging config options and/or sourcing them from an earlier config file
 - Think about how to handle differing metrics from GATK vs. DeepVariant
 
-
-## How to run:
-
-1. Copy `config.yaml` to your working directory and edit as necessary
-2. Copy `run_pipeline.sh` to your working directory and edit as necessary
-3. Run via `bash run_pipeline.sh`
 
 
 ## Pipeline/HPC Failure Scenarios Test 

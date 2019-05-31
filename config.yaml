@@ -1,15 +1,12 @@
-# maxThreads: 20
 maxJobs: 100
 
 inputDir: '/DCEG/CGF/Bioinformatics/Production/Shalabh/variantCallingPipelineGermlineHC4/example_data/bam/'
 outputDir: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/'
-  #'/DCEG/CGF/Bioinformatics/Production/Shalabh/variantCallingPipelineGermlineHC4/output_ScatterGather_3/'
 logDir: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/logs/'
 tempDir: '/ttemp/bballew/'
 
 intervalFile: '/DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.intervals'
 bedFile: '/DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.bed'
-# DV needs bed.  Can GATK use bed instead of interval, to simplify requirements?
 
 clusterMode: 'qsub -q xlong.q -V -j y -o /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/logs/'
 snakePath: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/variantCallingHC4/scripts/'
@@ -20,5 +17,4 @@ refGenome: '/DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/hg19_canonical_c
 
 useShards: TRUE  # shards vs. chroms to parallelize
 numShards: 4
-modelPath: '/opt/wgs/model.ckpt' # different models for WES vs. WGS
-  # note that DV is run in a container, and this is the path to the models within the container.
+modelPath: '/opt/wes/model.ckpt' # either /opt/wgs/model.ckpt or /opt/wes/model.ckpt for WGS or WES, respectively

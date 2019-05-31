@@ -145,7 +145,7 @@ rule split_bed_file:
 #     If we want to run this rule in parallel, we will need to split
 #     regions as we did previously.
 
-#     Note that -new-qual is now deprecated as of 4.1.0.0.
+#     Note that -new-qual is deprecated as of 4.1.0.0.
 #     '''
 #     input:
 #         ref = refGenome,
@@ -172,6 +172,7 @@ rule split_bed_file:
 #             -ERC GVCF \
 #             -L {input.interval} \
 #             -O {output.gvcf} \
+#             -new-qual \
 #             -G StandardAnnotation \
 #             -G StandardHCAnnotation'
 
@@ -202,6 +203,7 @@ rule HC_call_variants:
             -ERC GVCF \
             -L {input.interval} \
             -O {output.gvcf} \
+            -new-qual \
             -G StandardAnnotation \
             -G StandardHCAnnotation'
 
@@ -295,6 +297,7 @@ rule HC_genotype_gvcfs:
             -O {output.vcf} \
             --tmp-dir={params.temp} \
             -stand-call-conf 30 \
+            -new-qual \
             -G StandardAnnotation \
             -G StandardHCAnnotation'
         
