@@ -212,8 +212,8 @@ rule HC_compress_gvcfs:
     '''Zip and index gVCFs
     '''
     input:
-        outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf',
-        outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.idx'
+        gvcf = outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf',
+        idx = outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.idx'
     output:
         temp(outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.gz'),
         temp(outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.gz.tbi')
@@ -221,7 +221,7 @@ rule HC_compress_gvcfs:
     # singularity: '...'
     shell:
         'source /etc/profile.d/modules.sh; module load tabix bgzip;'
-        'bgzip {input}; tabix -p vcf {input}.gz'
+        'bgzip {input.gvcf}; tabix -p vcf {input.gvcf}.gz'
 
 rule HC_concat_gvcfs:
     input:
