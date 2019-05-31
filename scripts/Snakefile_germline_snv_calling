@@ -193,7 +193,8 @@ rule HC_call_variants:
         bam = inDir + '{sample}.bam',
         bai = inDir + '{sample}.bam.bai'
     output:
-        gvcf = temp(outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf')
+        gvcf = temp(outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf'),
+        idx = temp(outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.idx')
     params:
         e = gatkPath
     shell:
@@ -211,7 +212,8 @@ rule HC_compress_gvcfs:
     '''Zip and index gVCFs
     '''
     input:
-        outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf'
+        outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf',
+        outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.idx'
     output:
         temp(outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.gz'),
         temp(outDir + 'HaplotypeCaller/called/{chrom}/{sample}.g.vcf.gz.tbi')
