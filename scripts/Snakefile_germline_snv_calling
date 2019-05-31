@@ -192,14 +192,15 @@ rule HC_genotype_gvcfs:
         idx = outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz.tbi'
     params:
         e = gatkPath,
-        db = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}'
+        db = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}',
+        temp = tempDir
     threads: 5
     shell:
         '{params.e}gatk --java-options "-Xmx4G" GenotypeGVCFs \
             -R {input.ref} \
             -V gendb://{params.db} \
             -O {output.vcf} \
-            --tmp-dir=/ttemp \
+            --tmp-dir={params.temp} \
             -new-qual -stand-call-conf 30 \
             -G StandardAnnotation \
             -G StandardHCAnnotation'
