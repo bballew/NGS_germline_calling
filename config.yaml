@@ -1,4 +1,4 @@
-maxThreads: 20
+# maxThreads: 20
 maxJobs: 100
 
 inputDir: '/DCEG/CGF/Bioinformatics/Production/Shalabh/variantCallingPipelineGermlineHC4/example_data/bam/'
@@ -7,8 +7,8 @@ outputDir: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/te
 logDir: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/logs/'
 tempDir: '/ttemp/bballew/'
 
-intervalFile: '/DCEG/Projects/Exome/SequencingData/variant_scripts_V3_in_process/variant_intervals_beds/variant_calling_intervals_120430_HG19_ExomeV3_UTR_merged_padded250bp_merged_4000parts/120430_HG19_ExomeV3_UTR_merged_padded250bp_merged.intervals'
-bedFile: '/DCEG/Projects/Exome/SequencingData/variant_scripts_V3_in_process/variant_intervals_beds/variant_calling_intervals_120430_HG19_ExomeV3_UTR_merged_padded250bp_merged_4000parts/120430_HG19_ExomeV3_UTR_merged_padded250bp_merged.bed'
+intervalFile: '/DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.intervals'
+bedFile: '/DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.bed'
 # DV needs bed.  Can GATK use bed instead of interval, to simplify requirements?
 
 clusterMode: 'qsub -q xlong.q -V -j y -o /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/logs/'
