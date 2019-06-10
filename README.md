@@ -11,6 +11,7 @@ This Pipeline will serve as a CGR WGS/WES Germline Variant Calling pipeline for 
 1. Copy `config.yaml` to your working directory and edit as necessary
 2. Copy `run_pipeline.sh` to your working directory and edit as necessary
 3. Run via `bash run_pipeline.sh`
+4. Monitor progress by looking at log_<datetime>.out in the log directory (set in the config file).
 
 ## Configuring the pipeline
 
