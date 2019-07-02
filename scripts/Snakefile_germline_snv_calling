@@ -609,6 +609,8 @@ rule DV_GLmerge_gvcfs:
     GLnexus outputs uncompressed bcf.
 
     GLnexus creates a directory called "GLnexus.DB" in the working directory.  Track?
+    If this step fails, then the database GLnexus.DB already exists, and resuming
+    the pipeline will result in an error.  Add a timestamp?
 
     '''
     input:
