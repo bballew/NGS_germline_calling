@@ -31,6 +31,7 @@ configfile: conf
 # import variables from the config file
 refGenome = config['refGenome']
 gatkPath = config['gatkPath'].rstrip('/') + '/'  # ensure one trailing slash
+snakePath = config['snakePath'].rstrip('/') + '/'
 intervalFile = config['intervalFile']
 bedFile = config['bedFile']
 outDir = config['outputDir'].rstrip('/') + '/'
@@ -86,10 +87,9 @@ report: 'report/workflow.rst'
 
 rule all:
     input:
-        outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz.tbi',
-        outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz.tbi',
+        outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi',
         expand(outDir + 'deepVariant/called/vcfs/{sample}_all_chroms.vcf.gz', sample=sampleList),
-        outDir + 'deepVariant/genotyped/build_final.vcf.gz.tbi'
+        outDir + 'deepVariant/genotyped/DV_variants.vcf.gz.tbi'
 
 #######################################################################################################################
 ################################################ SPLIT REGIONS BY CHROM ###############################################
@@ -135,47 +135,6 @@ rule split_bed_file:
 ################################################ GATK HAPLOTYPE CALLER ################################################
 #######################################################################################################################
 
-# rule HC_call_variants:
-#     '''Call gVCFs with GATK4
-
-#     I've commented out all the threads sections of the rules.  For
-#     GATK4 specifically, it doesn't offer multithreading except with 
-#     the spark implementations of its tools, which is still in beta.
-#     Snakemake cannot re-architect software to become parallel.
-
-#     If we want to run this rule in parallel, we will need to split
-#     regions as we did previously.
-
-#     Note that -new-qual is deprecated as of 4.1.0.0.
-#     '''
-#     input:
-#         ref = refGenome,
-#         i1 = refGenome + '.amb',
-#         i2 = refGenome + '.ann',
-#         i3 = refGenome + '.bwt',
-#         i4 = refGenome + '.pac',
-#         i5 = refGenome + '.sa',
-#         i6 = refGenome + '.fai',
-#         i7 = dictionaryFile,
-#         interval =  intervalFile,
-#         bam = inDir + '{sample}.bam',
-#         bai = inDir + '{sample}.bam.bai'
-#     output:
-#         gvcf = outDir + 'HaplotypeCaller/called/{sample}.g.vcf'
-#     params:
-#         e = gatkPath
-#     # threads: nt
-#     # singularity: 'docker://broadinstitute/gatk'
-#     shell:
-#         '{params.e}gatk --java-options "-Xmx4G" HaplotypeCaller \
-#             -R {input.ref} \
-#             -I {input.bam} \
-#             -ERC GVCF \
-#             -L {input.interval} \
-#             -O {output.gvcf} \
-#             -new-qual \
-#             -G StandardAnnotation \
-#             -G StandardHCAnnotation'
 
 rule HC_call_variants:
     '''Call gVCFs with GATK4
@@ -331,29 +290,29 @@ rule HC_genotype_gvcfs:
             -G StandardAnnotation \
             -G StandardHCAnnotation'
         
-rule HC_concat_vcfs_gatk:
-    '''
-    Why both gatk and bcftools (below)?  Wen says Shalabh
-    was just comparing.  Compare and make a decision?
+# rule HC_concat_vcfs_gatk:
+#     '''
+#     Why both gatk and bcftools (below)?  Wen says Shalabh
+#     was just comparing.  Compare and make a decision?
 
-    Note that the documentation for this tool says it needs
-    the inputs to be in genomic order.  This should happen correctly,
-    as the expand order will follow the chromList order.
+#     Note that the documentation for this tool says it needs
+#     the inputs to be in genomic order.  This should happen correctly,
+#     as the expand order will follow the chromList order.
 
-    Changed from GatherVcfsCloud to GatherVcfs, as the former is
-    still in beta.
-    '''
-    input:
-        vcfList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz', chrom=chromList)
-    output:
-        projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz')
-    params:
-        e = gatkPath,
-        vcfList_params = lambda wildcards, input:" -I ".join(input.vcfList)
-    benchmark:
-        'run_times/HC_concat_vcfs_gatk/build_final.tsv'
-    shell:
-        '{params.e}gatk --java-options "-Xmx4G" GatherVcfs -I {params.vcfList_params} -O {output.projectVCF}'
+#     Changed from GatherVcfsCloud to GatherVcfs, as the former is
+#     still in beta.
+#     '''
+#     input:
+#         vcfList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz', chrom=chromList)
+#     output:
+#         projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz')
+#     params:
+#         e = gatkPath,
+#         vcfList_params = lambda wildcards, input:" -I ".join(input.vcfList)
+#     benchmark:
+#         'run_times/HC_concat_vcfs_gatk/build_final.tsv'
+#     shell:
+#         '{params.e}gatk --java-options "-Xmx4G" GatherVcfs -I {params.vcfList_params} -O {output.projectVCF}'
         
 rule HC_concat_vcfs_bcftools:
     '''
@@ -362,11 +321,11 @@ rule HC_concat_vcfs_bcftools:
         vcfList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz', chrom=chromList),
         indexList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz.tbi', chrom=chromList)
     output:
-        projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz')
+        projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz')
     params:
         tempDir + 'HC_concat_vcfs_bcftools/'
     benchmark:
-        'run_times/HC_concat_vcfs_bcftools/build_final.tsv'
+        'run_times/HC_concat_vcfs_bcftools/HC_variants.tsv'
     shell:
         'source /etc/profile.d/modules.sh; module load bcftools tabix;'
         'mkdir -p {params}; bcftools concat -a {input.vcfList} -Ou | bcftools sort -T {params} -Oz -o {output.projectVCF}'
@@ -375,17 +334,14 @@ rule HC_index_vcfs:
     '''
     '''
     input:
-        vcf1 = outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz',
-        vcf2 = outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz'
+        vcf = outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz'
     output:
-        idx1 = protected(outDir + 'HaplotypeCaller/genotyped/combined/gatk/build_final.vcf.gz.tbi'),
-        idx2 = protected(outDir + 'HaplotypeCaller/genotyped/combined/bcftools/build_final.vcf.gz.tbi')
+        idx = protected(outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi')
     benchmark:
-        'run_times/HC_index_vcfs/build_final.tsv'
+        'run_times/HC_index_vcfs/HC_variants.tsv'
     shell:
         'source /etc/profile.d/modules.sh; module load tabix;'
-        'tabix -p vcf {input.vcf1};'
-        'tabix -p vcf {input.vcf2}'
+        'tabix -p vcf {input.vcf}'
 
 
 #######################################################################################################################
@@ -394,8 +350,6 @@ rule HC_index_vcfs:
 
 rule DV_make_examples:
     '''Generate TF examples for evaluation with DV models
-
-    TODO: using shards test works; need to try with chroms.
 
     "consumes reads and the reference genome to create TensorFlow
     examples for evaluation with our deep learning models"
@@ -618,9 +572,9 @@ rule DV_GLmerge_gvcfs:
         m = 'deepVariant/called/gvcfs/manifest.txt',
         b = bedFile
     output: 
-        temp(outDir + 'deepVariant/genotyped/build_final.bcf')
+        temp(outDir + 'deepVariant/genotyped/DV_variants.bcf')
     benchmark:
-        'run_times/DV_GLmerge_gvcfs/build_final.tsv'
+        'run_times/DV_GLmerge_gvcfs/DV_variants.tsv'
     shell:
         'source /etc/profile.d/modules.sh; module load glnexus/1.1.5 gcc;'
         'glnexus_cli --config DeepVariant --bed {input.b} --list {input.m} > {output}'
@@ -629,12 +583,12 @@ rule DV_compress_merged_vcfs:
     '''
     '''
     input:
-        outDir + 'deepVariant/genotyped/build_final.bcf'
+        outDir + 'deepVariant/genotyped/DV_variants.bcf'
     output:
-        gz = protected(outDir + 'deepVariant/genotyped/build_final.vcf.gz'),
-        tbi = protected(outDir + 'deepVariant/genotyped/build_final.vcf.gz.tbi')
+        gz = protected(outDir + 'deepVariant/genotyped/DV_variants.vcf.gz'),
+        tbi = protected(outDir + 'deepVariant/genotyped/DV_variants.vcf.gz.tbi')
     benchmark:
-        'run_times/DV_compress_merged_vcfs/build_final.tsv'
+        'run_times/DV_compress_merged_vcfs/DV_variants.tsv'
     shell:
         'source /etc/profile.d/modules.sh; module load tabix bcftools;'
         'bcftools view {input} | bgzip -c > {output.gz}; tabix -p vcf {output.gz}'
