@@ -166,7 +166,7 @@ rule HC_concat_vcfs_bcftools:
         vcfList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz', chrom=chromList),
         indexList = expand(outDir + 'HaplotypeCaller/genotyped/{chrom}.vcf.gz.tbi', chrom=chromList)
     output:
-        projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz')
+        projectVCF = protected(outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz'),
         idx = protected(outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi')
     params:
         tempDir + 'HC_concat_vcfs_bcftools/'
