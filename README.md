@@ -3,8 +3,16 @@
 
 
 ## Introduction
-This Pipeline will serve as a CGR WGS/WES Germline Variant Calling pipeline for internal or external projects.  The pipeline takes calibrated and indexed BAMs as input and generates two compressed and indexed multi-sample VCFs file as final output - one with DeepVariant calls and one with GATK4 HaplotypeCaller calls.  These VCFs can then be fed into the ensemble bcbio pipeline.
 
+This pipeline can be used to call germline SNVs and small indels for WGS/WES short read germline sequencing data.  
+
+__Input:__
+- Aligned and indexed BAM files
+- Edited `config.yaml` file
+
+__Output:__
+- Multi-sample VCFs called with either DeepVariant or HaplotypeCaller
+- A multi-sample VCF containing the union of the DeepVariant and HaplotypeCaller calls
 
 ## How to run:
 
@@ -23,12 +31,18 @@ This Pipeline will serve as a CGR WGS/WES Germline Variant Calling pipeline for 
 - `useShards` is a boolean to allow parallelization of DeepVariant over shards (e.g. if numShards=10, then each "shard" will contain 10% of the data) or over chromosomes
 - `modelPath` has two options provided by DeepVariant, /opt/wgs/model.ckpt or /opt/wes/model.ckpt for WGS or WES, respectively
 
+## How to perform black box testing to identify regressions
+
+- Open `scripts/blackboxtests.sh` and edit `myInPath` and `myOutPath` if necessary
+- Run via `bash scripts/blackboxtests.sh`
+- Upon completion, run `bash scripts/blackboxdiffs.sh <datestamp>`, where <datestamp> is the date appended to the test run's `tests/out_<datestamp>` directory
+- Look for PASS/ERROR status of each test (printed to stdout and saved to a file `tests/out_<datestamp>/diff_tests.txt`
 
 ------------------------------------------------
 
 
 ## To do:
-
+__MOVE TO ISSUES.__
 - Compare GATK and bcftools for concatenation of HaplotypeCaller VCFs and choose one
 - Possibly add variant- and allele-level annotations
 - Implement parallelization by region for merging with GLnexus
