@@ -1,0 +1,45 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency estimate for each alternate allele">
+##INFO=<ID=AQ,Number=A,Type=Integer,Description="Allele Quality score reflecting evidence for each alternate allele (Phred scale)">
+##FILTER=<ID=MONOALLELIC,Description="Site represents one ALT allele in a region with multiple variants that could not be unified into non-overlapping multi-allelic sites">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=RNC,Number=2,Type=Character,Description="Reason for No Call in GT: . = n/a, M = Missing data, P = Partial data, D = insufficient Depth of coverage, - = unrepresentable overlapping deletion, L = Lost/unrepresentable allele (other than deletion), U = multiple Unphased variants present, O = multiple Overlapping variants present, 1 = site is Monoallelic, no assertion about presence of REF or ALT allele">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
+##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Phred-scaled genotype Likelihoods">
+##contig=<ID=chrM,length=16571>
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr2,length=243199373>
+##contig=<ID=chr3,length=198022430>
+##contig=<ID=chr4,length=191154276>
+##contig=<ID=chr5,length=180915260>
+##contig=<ID=chr6,length=171115067>
+##contig=<ID=chr7,length=159138663>
+##contig=<ID=chr8,length=146364022>
+##contig=<ID=chr9,length=141213431>
+##contig=<ID=chr10,length=135534747>
+##contig=<ID=chr11,length=135006516>
+##contig=<ID=chr12,length=133851895>
+##contig=<ID=chr13,length=115169878>
+##contig=<ID=chr14,length=107349540>
+##contig=<ID=chr15,length=102531392>
+##contig=<ID=chr16,length=90354753>
+##contig=<ID=chr17,length=81195210>
+##contig=<ID=chr18,length=78077248>
+##contig=<ID=chr19,length=59128983>
+##contig=<ID=chr20,length=63025520>
+##contig=<ID=chr21,length=48129895>
+##contig=<ID=chr22,length=51304566>
+##contig=<ID=chrX,length=155270560>
+##contig=<ID=chrY,length=59373566>
+##GLnexusVersion=v1.1.5-0-ge25a6be
+##GLnexusConfig=DeepVariant
+##GLnexusConfigCRC32C=754566310
+##bcftools_viewVersion=1.9-64-g28bcc56-dirty+htslib-1.9-52-g6e86e38
+##bcftools_viewCommand=view /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out/deepVariant/genotyped/DV_variants.bcf; Date=Fri Aug 16 11:53:56 2019
+##bcftools_normVersion=1.9-64-g28bcc56-dirty+htslib-1.9-52-g6e86e38
+##bcftools_normCommand=norm -f /DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/hg19_canonical_correct_chr_order.fa -m - --threads 8 -Oz -o /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out/ensemble/DV_normalized.vcf.gz /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out/deepVariant/genotyped/DV_variants.vcf.gz; Date=Tue Aug 20 12:29:59 2019
+##bcftools_viewCommand=view --threads 8 -I -h -Ov -o /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out/ensemble/DV_header.vcf /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out/ensemble/DV_normalized.vcf.gz; Date=Tue Aug 20 12:30:24 2019
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	CTRL_NA12878_CL_UNK_GDNA_50_NA
