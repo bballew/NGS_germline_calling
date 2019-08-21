@@ -1,3 +1,5 @@
+tests/out_*
+
 .DS_Store
 
 .Rproj.user
