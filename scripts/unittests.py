@@ -8,16 +8,16 @@ import genotype_union as gt
 class TestGenotypeUnion(unittest.TestCase):
 
     def test_check_file_pass(self):
-        self.assertEqual(gt.check_file('/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/test_data/t.vcf'), 0)
+        self.assertEqual(gt.check_file('/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/data/all_callers.vcf'), 0)
 
     def test_check_file_fail(self):
         self.assertNotEqual(gt.check_file('/DCEG/CGF/Bioinformatics/Production/Bari/pretend_file.vcff'), 0)
 
     def test_get_header_pass(self):
-        self.assertListEqual(gt.get_header('/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/test_data/t.vcf'), ['#CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT','CHM1_CHM13_2','CHM1_CHM13_3','2:CHM1_CHM13_2','2:CHM1_CHM13_3'])
+        self.assertListEqual(gt.get_header('/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/data/all_callers.vcf'), ['#CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT','CHM1_CHM13_2','CHM1_CHM13_3','2:CHM1_CHM13_2','2:CHM1_CHM13_3'])
 
     def test_get_header_fail(self):
-        self.assertEqual(gt.get_header('/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/test_data/no_headers.vcf'), 1)
+        self.assertEqual(gt.get_header('/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/data/no_headers.vcf'), 1)
 
     def test_vcf_check_pass(self):
         self.assertEqual(gt.vcf_check(['#CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT','CHM1_CHM13_2','CHM1_CHM13_3']), 0)
