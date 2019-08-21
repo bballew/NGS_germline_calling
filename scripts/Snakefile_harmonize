@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+# Authors: Bari Ballew
+
+'''VCF harmonization module of CGR germline variant calling pipeline
+'''
+
+
+rule HC_norm_left_align_split:
+    '''Normalize, left-align, and split mulit-allelics in the HC vcf.
+    '''
+    input:
+        vcf = outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz',
+        i = outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi',
+        ref = refGenome
+    output:
+        outDir + 'ensemble/HC_normalized.vcf.gz'
+    benchmark:
+        'run_times/HC_norm_left-align_split/norm.tsv'
+    threads: 8
+    shell:
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
+        'bcftools norm -f {input.ref} -m - --threads {threads} {input.vcf} -Oz -o {output}'
+
+rule DV_norm_left_align_split:
+    '''Normalize, left-align, and split mulit-allelics in the DV vcf.
+    '''
+    input:
+        vcf = outDir + 'deepVariant/genotyped/DV_variants.vcf.gz',
+        i = outDir + 'deepVariant/genotyped/DV_variants.vcf.gz.tbi',
+        ref = refGenome
+    output:
+        outDir + 'ensemble/DV_normalized.vcf.gz'
+    benchmark:
+        'run_times/DV_norm_left-align_split/norm.tsv'
+    threads: 8
+    shell:
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
+        'bcftools norm -f {input.ref} -m - --threads {threads} {input.vcf} -Oz -o {output}'
+
+rule separate_header_and_vars:
+    input:
+        outDir + 'ensemble/{caller}_normalized.vcf.gz'
+    output:
+        h = outDir + 'ensemble/{caller}_header.vcf',
+        v = outDir + 'ensemble/{caller}_vars.vcf'
+    benchmark:
+        'run_times/separate_header_and_vars/{caller}.tsv'
+    threads: 8
+    shell:
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
+        'bcftools view --threads {threads} -I -h {input} -Ov -o {output.h};'
+        'bcftools view --threads {threads} -I -H {input} -Ov -o {output.v}'
+
+rule prepend_labels:
+    '''Prepend INFO and FORMAT tags with DV_ or HC_
+    Update headers to match.
+    Note that this is a bash script with no unit testing implemented.
+    '''
+    input:
+        v = outDir + 'ensemble/{caller}_vars.vcf',
+        h = outDir + 'ensemble/{caller}_header.vcf'
+    output:
+        v = outDir + 'ensemble/prepended.{caller}_vars.vcf',
+        h = outDir + 'ensemble/prepended.{caller}_header.vcf'
+    benchmark:
+        'run_times/prepend_labels/{caller}.tsv'
+    params:
+        e = snakePath
+    shell:
+        '{params.e}prepend_labels.sh {input.v} {input.h} {wildcards.caller};'
+
+rule recombine_headers_and_vars:
+    '''
+    '''
+    input:
+        v = outDir + 'ensemble/prepended.{caller}_vars.vcf',
+        h = outDir + 'ensemble/prepended.{caller}_header.vcf'
+    output:
+        g = outDir + 'ensemble/{caller}_labeled.vcf.gz',
+        i = outDir + 'ensemble/{caller}_labeled.vcf.gz.tbi'
+    benchmark:
+        'run_times/recombine_headers_and_vars/{caller}.tsv'
+    # threads:
+    params:
+        v = outDir + 'ensemble/{caller}_labeled.vcf'
+    shell:
+        'source /etc/profile.d/modules.sh; module load tabix/1.9;'
+        'cat {input.h} {input.v} > {params.v};'
+        'bgzip {params.v}; tabix -p vcf {output.g}'
+
+rule merge_by_variant:
+    '''
+    Note that GATK CombineVariants and MergeVcfs were also tried here.
+    MergeVCFS interleaves by row (useless).
+    CombineVariants works quite nicely except that it incorreclty merges 
+    multi-allelics ((0/1 C>A 0/1 C>T both become 0/1 C>A,T, so you lose
+    the alt2 information entirely).  This behavior is hard coded.  Usage tried:
+        # 'java -jar /DCEG/CGF/Bioinformatics/Production/Bari/gatk3.7/GenomeAnalysisTK.jar -T CombineVariants -R /DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/Homo_sapiens_assembly19.fasta -V:dv dv.vcf -V:hc hc.vcf  -o prioritize_dv_hc.vcf -genotypeMergeOptions PRIORITIZE -priority dv,hc'
+        # 'java -jar /DCEG/CGF/Bioinformatics/Production/Bari/gatk3.7/GenomeAnalysisTK.jar -T CombineVariants -R /DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/Homo_sapiens_assembly19.fasta -V:dv dv.vcf -V:hc hc.vcf  -o prioritize_hc_dv.vcf -genotypeMergeOptions PRIORITIZE -priority hc,dv'
+    bcftools merge gets closest to the desired format while still
+    maintaining all information in the vcf.
+    '''
+    input: 
+        expand(outDir + 'ensemble/{caller}_labeled.vcf.gz',caller=CALLERS)
+    output:
+        outDir + 'ensemble/all_callers.vcf'
+    benchmark:
+        'run_times/merge_by_variant/all_callers.tsv'
+    threads: 8
+    shell:
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
+        'bcftools merge --force-samples --threads {threads} -m none {input} -Ov -o {output}'
+
+rule merge_by_sample:
+    '''
+    Note that this python script has a companion suite of unit tests in the
+    scripts/ directory.
+    '''
+    input:
+        outDir + 'ensemble/all_callers.vcf'
+    output:
+        g = outDir + 'ensemble/all_callers_merged_genotypes.vcf.gz',
+        i = outDir + 'ensemble/all_callers_merged_genotypes.vcf.gz.tbi'
+    benchmark:
+        'run_times/merge_by_sample/all_callers_merged_genotypes.tsv'
+    params:
+        v = outDir + 'ensemble/all_callers_merged_genotypes.vcf',
+        e = snakePath
+    shell:
+        'source /etc/profile.d/modules.sh; module load python3/3.6.3 tabix/1.9;'
+        'python3 {params.e}genotype_union.py {input} {params.v};'
+        'bgzip {params.v}; tabix -p vcf {output.g}'
+
+
+
+
+########################## working notes
+
+
+
+# deep variant
+
+# #CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  CHM1_CHM13_2    CHM1_CHM13_3
+# 1       10146   1_10146_AC_A    AC      A       3       .       AF=0.25;AQ=3    GT:DP:AD:GQ:PL:RNC      0/1:48:41,6:5:3,0,30:.. 0/0:53:53,0:0:.:..
+# 1       10440   1_10440_C_A     C       A       5       .       AF=0.25;AQ=5    GT:DP:AD:GQ:PL:RNC      0/0:88:88,0:50:.:..     0/1:75:64,9:7:5,0,29:..
+# 1       10611   1_10611_C_G     C       G       9       .       AF=0.5;AQ=9     GT:DP:AD:GQ:PL:RNC      0/1:11:8,3:7:9,0,9:..   0/1:11:9,2:3:0,0,12:..
+# 1       10623   1_10623_T_C     T       C       2       .       AF=0.5;AQ=2     GT:DP:AD:GQ:PL:RNC      1/1:3:0,3:7:2,5,0:..    0/0:2:0,2:3:.:..
+# 1       10815   1_10815_T_TC    T       TC      20      .       AF=1;AQ=20      GT:DP:AD:GQ:PL:RNC      1/1:5:2,3:8:15,8,0:..   1/1:3:1,2:9:20,9,0:..
+# 1       10904   1_10904_G_A     G       A       17      .       AF=0.25;AQ=17   GT:DP:AD:GQ:PL:RNC      0/0:2:2,0:0:.:..        0/1:5:3,2:15:17,0,17:..
+# 1       10927   1_10927_A_G     A       G       12      .       AF=0.5;AQ=12    GT:DP:AD:GQ:PL:RNC      0/0:1:1,0:0:.:..        1/1:3:1,2:5:12,3,0:..
+
+
+
+
+# HC
+
+# #CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  CHM1_CHM13_2    CHM1_CHM13_3
+# 1       10403   .       ACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAAC  A       176.88  .       AC=1;AF=0.25;AN=4;BaseQRankSum=1.11;DP=117;ExcessHet=3.0103;FS=16.472;MLEAC=1;MLEAF=0.25;MQ=42.24;MQRankSum=-0.449;QD=7.08;ReadPosRankSum=-1.14;SOR=2.215       GT:AD:DP:GQ:PL  0/1:19,6:25:99:185,0,719        0/0:66,0:66:72:0,72,1080
+# 1       10492   .       C       T       63.29   .       AC=1;AF=0.25;AN=4;BaseQRankSum=-0.865;DP=77;ExcessHet=3.9794;FS=5.614;MLEAC=1;MLEAF=0.25;MQ=52.17;MQRankSum=-0.7;QD=3.52;ReadPosRankSum=-1.116;SOR=1.472        GT:AD:DP:GQ:PL  0/1:14,4:18:70:70,0,378 0/0:41,0:41:0:0,0,893
+# 1       10616   .       CCGCCGTTGCAAAGGCGCGCCG  C       587.46  .       AC=2;AF=0.5;AN=4;BaseQRankSum=2.01;DP=31;ExcessHet=4.7712;FS=30.983;MLEAC=2;MLEAF=0.5;MQ=50.02;MQRankSum=2.29;QD=26.7;SOR=5.546 GT:AD:DP:GQ:PL  0/1:2,8:10:99:318,0,143 0/1:5,7:12:99:279,0,390
+# 1       12719   .       G       C       32.29   .       AC=1;AF=0.25;AN=4;BaseQRankSum=-1.645;DP=12;ExcessHet=3.0103;FS=0;MLEAC=1;MLEAF=0.25;MQ=24.28;MQRankSum=-1.282;QD=6.46;ReadPosRankSum=-1.645;SOR=0.446  GT:AD:DP:GQ:PL  0/0:7,0:7:0:0,0,103     0/1:3,2:5:39:39,0,75
+# 1       12783   .       G       A       477.46  .       AC=2;AF=0.5;AN=4;BaseQRankSum=2.37;DP=27;ExcessHet=4.7712;FS=0;MLEAC=2;MLEAF=0.5;MQ=26.12;MQRankSum=0.709;QD=17.68;ReadPosRankSum=-0.25;SOR=2.066       GT:AD:DP:GQ:PGT:PID:PL  0/1:4,15:19:87:0|1:12783_G_A:363,0,87   0/1:3,5:8:55:.:.:124,0,55
+# 1       13110   .       G       A       177.46  .       AC=2;AF=0.5;AN=4;BaseQRankSum=2.4;DP=78;ExcessHet=4.7712;FS=4.474;MLEAC=2;MLEAF=0.5;MQ=31.18;MQRankSum=-0.797;QD=2.28;ReadPosRankSum=1.53;SOR=1.469     GT:AD:DP:GQ:PGT:PID:PL  0/1:28,8:36:99:.:.:135,0,1201   0/1:36,6:42:52:0|1:13110_G_A:52,0,1741
+
+
+
+
+
+# ensembled
+
+# #CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  CHM1_CHM13_2    CHM1_CHM13_3
+# a       a       b       a       a       c       c       d,f     d       e               e
+
+# a) should be identical in DV vs HC after normalization/left alignment etc; if it's not identical, treat as a split multi-allelic
+# b) either HC annotation or ., don't use DV ID
+# c) not sure
+    # for QUAL - adjust scale?  See if there's a correlation in truth sets with concordant calls?
+    # keep original QUAL scores in INFO (DV AQ already there)
+# d) include all DV and HC values; prepend with DV_ or HC_ as needed
+# e) include all DV and HC values; refer to format field and (d) to interpret
+# f) add an INFO flag to say whether the variant was concordant in both callers
+
+# example:
+
+# #CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  CHM1_CHM13_2    CHM1_CHM13_3
+# 1       10146   .       C       A       ??      ??      DV_AF=0.25;DV_AQ=3;HC_AC=1;HC_AF=0.25;HC_AN=4;HC_BaseQRankSum=-1.645;HC_DP=12;HC_ExcessHet=3.0103;HC_FS=0;HC_MLEAC=1;HC_MLEAF=0.25;HC_MQ=24.28;HC_MQRankSum=-1.282;HC_QD=6.46;HC_ReadPosRankSum=-1.645;HC_SOR=0.446;DV_QUAL=10;HC_QUAL=30    DV_GT:DV_DP:DV_AD:DV_GQ:DV_PL:DV_RNC:HC_GT:HC_AD:HC_DP:HC_GQ:HC_PL      0/1:48:41,6:5:3,0,30:..:0/0:7,0:7:0:0,0,103 0/0:53:53,0:0:.:..:0/1:3,2:5:39:39,0,75
+
+
+# use QD in qual field?
+# ask Xiaopeng to run on CCSS to test performance on large dataset (2-3k samples?  one part?)
