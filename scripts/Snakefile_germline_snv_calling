@@ -93,9 +93,12 @@ report: 'report/workflow.rst'
 
 rule all:
     input:
-        outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi',
+        # outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi',
         expand(outDir + 'deepVariant/called/vcfs/{sample}_all_chroms.vcf.gz', sample=sampleList),
-        outDir + 'deepVariant/genotyped/DV_variants.vcf.gz.tbi'
+        # outDir + 'deepVariant/genotyped/DV_variants.vcf.gz.tbi',
+        outDir + 'ensemble/all_callers_merged_genotypes.vcf.gz.tbi'
+
+        # if we want to allow options for calling without combining/harmonizing, will need conditional inputs here and below at include statements
 
 rule split_bed_file:
     '''Separates bed regions by chromosome.
@@ -134,8 +137,9 @@ rule split_bed_file:
         #'grep -m1 {wildcards.chrom} {input}; if [ $? -lt 2 ]; then grep {wildcards.chrom} {input} > {output}; fi'
 
 
-include: Snakefile_HaplotypeCaller
-include: Snakefile_DeepVariant
+include: 'Snakefile_HaplotypeCaller'
+include: 'Snakefile_DeepVariant'
+include: 'Snakefile_harmonize'
 
 
 
