@@ -11,15 +11,16 @@ __Input:__
 - Edited `config.yaml` file
 
 __Output:__
-- Multi-sample VCFs called with either DeepVariant or HaplotypeCaller
-- A multi-sample VCF containing the union of the DeepVariant and HaplotypeCaller calls
+- Multi-sample VCF called with DeepVariant
+- Multi-sample VCF called with HaplotypeCaller
+- Multi-sample VCF containing the union of the DeepVariant and HaplotypeCaller calls
 
 ## How to run:
 
 1. Copy `config.yaml` to your working directory and edit as necessary
 2. Copy `run_pipeline.sh` to your working directory and edit as necessary
 3. Run via `bash run_pipeline.sh`
-4. Monitor progress by looking at log_<datetime>.out in the log directory (set in the config file).
+4. Monitor progress by looking at `log_<datetime>.out` in the log directory (set in the config file).
 
 ## Configuring the pipeline
 
@@ -35,7 +36,7 @@ __Output:__
 
 - Open `scripts/blackboxtests.sh` and edit `myInPath` and `myOutPath` if necessary
 - Run via `bash scripts/blackboxtests.sh`
-- Upon completion, run `bash scripts/blackboxdiffs.sh <datestamp>`, where <datestamp> is the date appended to the test run's `tests/out_<datestamp>` directory
+- Upon completion, run `bash scripts/blackboxdiffs.sh `<datestamp>`, where `<datestamp>` is the date appended to the test run's `tests/out_<datestamp>` directory
 - Look for PASS/ERROR status of each test (printed to stdout and saved to a file `tests/out_<datestamp>/diff_tests.txt`
 
 ------------------------------------------------
