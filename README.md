@@ -36,7 +36,7 @@ __Output:__
 
 - Open `scripts/blackboxtests.sh` and edit `myInPath` and `myOutPath` if necessary
 - Run via `bash scripts/blackboxtests.sh`
-- Upon completion, run `bash scripts/blackboxdiffs.sh `<datestamp>`, where `<datestamp>` is the date appended to the test run's `tests/out_<datestamp>` directory
+- Upon completion, run `bash scripts/blackboxdiffs.sh <datestamp>`, where `<datestamp>` is the date appended to the test run's `tests/out_<datestamp>` directory
 - Look for PASS/ERROR status of each test (printed to stdout and saved to a file `tests/out_<datestamp>/diff_tests.txt`
 
 ------------------------------------------------
@@ -71,5 +71,3 @@ __MOVE TO ISSUES.__
       + How to work with Empty or Incomplete Directories
       + Resumability of an analyis (for example - gvcf generation job) from the beginning or from the point it got interrupted??
       + Voluntary Termination vs Interupted Jobs
-  
-  
