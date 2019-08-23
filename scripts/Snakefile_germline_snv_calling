@@ -22,6 +22,7 @@ Output:
 
 
 import os
+import subprocess
 import glob
 
 # reference the config file
@@ -74,7 +75,7 @@ with open(dictionaryFile) as f:
     for line in f:
         f1 = line.split("\t")[1]
         f2 = f1.split(":")[1]
-        if "M" not in f2:  # exclude chrM, otherwise creates an empty interval file which GATK doesn't like
+        if not subprocess.call(['grep', '-q', '^' + f2 + ':', intervalFile]): # exclude chroms not in the regions of interest, otherwise creates an empty interval file which GATK doesn't like
             chromList.append(f2)
 
 def get_DBImport_path1(wildcards):
