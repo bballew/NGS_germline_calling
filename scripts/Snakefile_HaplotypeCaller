@@ -83,6 +83,41 @@ rule HC_index_gvcf:
         'source /etc/profile.d/modules.sh; module load tabix;'
         'tabix -p vcf {input}'
 
+rule HC_create_each_sample_map_file:
+    '''Create sample file to be read by GenomicsDBImport
+
+    Can pass all vcfs on the command line, each with a -V before it,
+    but with enough samples you will hit the character limit.  Instead,
+    create a sample map file and read from it.  
+
+    sample map is formatted as follows: sample_name--tab--path_to_sample_vcf per line
+
+    See GATK's documentation for additional details.
+    '''
+    input:
+        gvcf = outDir + "HaplotypeCaller/called/{sample}_all_chroms.g.vcf.gz",
+        index = outDir + "HaplotypeCaller/called/{sample}_all_chroms.g.vcf.gz.tbi"
+    output:
+        temp(outDir + 'HaplotypeCaller/DBImport/{sample}.map')
+        # outDir + 'HaplotypeCaller/DBImport/cohort.sample_map'
+    benchmark:
+        'run_times/create_sample_map/{sample}.tsv'
+    shell:
+        'source /etc/profile.d/modules.sh; module load bcftools;'
+        'n=$(bcftools query -l {input.gvcf});'
+        'echo "${{n}}\t{input.gvcf}" > {output}'
+        # 'echo {input.gvcfList} | tr " " "\n" | sed "s///"'
+
+rule HC_create_cohort_map_file:
+    input:
+        expand(outDir + 'HaplotypeCaller/DBImport/{sample}.map', sample=sampleList)
+    output:
+        outDir + 'HaplotypeCaller/DBImport/cohort.sample_map'
+    benchmark:
+        'run_times/create_cohort_map_file.tsv'
+    shell:
+        'cat {input} > {output}'
+
 rule HC_consolidate_gvcfs:
     '''Split samples by chromosome
 
@@ -109,6 +144,7 @@ rule HC_consolidate_gvcfs:
     for more details.
     '''
     input: 
+        sampleMap = outDir + 'HaplotypeCaller/DBImport/cohort.sample_map',
         gvcfList = expand(outDir + "HaplotypeCaller/called/{sample}_all_chroms.g.vcf.gz", sample=sampleList),
         indexList = expand(outDir + "HaplotypeCaller/called/{sample}_all_chroms.g.vcf.gz.tbi", sample=sampleList)
     output:
@@ -118,13 +154,14 @@ rule HC_consolidate_gvcfs:
         o4 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/__tiledb_workspace.tdb'
     params:
         e = gatkPath,
-        gvcfList = lambda wildcards, input:" -V ".join(input.gvcfList),
+        # gvcfList = lambda wildcards, input:" -V ".join(input.gvcfList),
         interval = '{chrom}',
         db = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}'
     benchmark:
         'run_times/HC_consolidate_gvcfs/{chrom}.tsv'
     shell:
-        'rm -r {params.db}; {params.e}gatk --java-options "-Xmx4G" GenomicsDBImport -V {params.gvcfList} --genomicsdb-workspace-path {params.db} -L {params.interval}'
+        'rm -r {params.db}; {params.e}gatk --java-options "-Xmx4G" GenomicsDBImport --sample-name-map {input.sampleMap} --genomicsdb-workspace-path {params.db} -L {params.interval}'
+        # 'rm -r {params.db}; {params.e}gatk --java-options "-Xmx4G" GenomicsDBImport -V {params.gvcfList} --genomicsdb-workspace-path {params.db} -L {params.interval}'
 
 rule HC_genotype_gvcfs:
     '''Joint genotyping
