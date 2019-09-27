@@ -116,7 +116,7 @@ rule HC_create_cohort_map_file:
     benchmark:
         'run_times/create_cohort_map_file.tsv'
     shell:
-        'cat {input} > {output}'
+        'n=({input}); for i in ${n[@]}; do cat $i >> {output}; done'
 
 rule HC_consolidate_gvcfs:
     '''Split samples by chromosome
