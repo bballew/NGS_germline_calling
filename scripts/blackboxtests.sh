@@ -5,6 +5,7 @@
 DATE=$(date +"%Y%m%d%H%M")
 myInPath="/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/data/"
 myOutPath="/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out_${DATE}/"
+myTempPath="/ttemp/bballew/${DATE}/"
 
 if [ ! -d "$myOutPath" ]; then
     mkdir -p "$myOutPath" || die "mkdir ${myOutPath} failed"
@@ -12,12 +13,17 @@ else
     echo "${myOutPath} already exists!"
 fi
 
+# if [ ! -d "$myTempPath" ]; then
+#     mkdir -p "$myTempPath" || die "mkdir ${myTempPath} failed"
+# fi
+
+
 # generate a test config:
 echo "maxJobs: 100" > ${myOutPath}/TESTconfig.yaml
 echo "inputDir: '${myInPath}'" >> ${myOutPath}/TESTconfig.yaml
 echo "outputDir: '${myOutPath}'" >> ${myOutPath}/TESTconfig.yaml
 echo "logDir: '${myOutPath}/logs/'" >> ${myOutPath}/TESTconfig.yaml
-echo "tempDir: '/ttemp/bballew/${DATE}/'" >> ${myOutPath}/TESTconfig.yaml
+echo "tempDir: '${myTempPath}'" >> ${myOutPath}/TESTconfig.yaml
 echo "intervalFile: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/regions/seqcap_EZ_Exome_v3_v3utr_intersect_correct_NOchr4.intervals'" >> ${myOutPath}/TESTconfig.yaml
 echo "bedFile: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/regions/seqcap_EZ_Exome_v3_v3utr_intersect_correct_NOchr4.bed'" >> ${myOutPath}/TESTconfig.yaml
 echo "clusterMode: 'qsub -q long.q -V -j y -o ${myOutPath}/logs/'" >> ${myOutPath}/TESTconfig.yaml
