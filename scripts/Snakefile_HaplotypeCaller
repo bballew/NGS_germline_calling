@@ -113,10 +113,12 @@ rule HC_create_cohort_map_file:
         expand(outDir + 'HaplotypeCaller/DBImport/{sample}.map', sample=sampleList)
     output:
         outDir + 'HaplotypeCaller/DBImport/cohort.sample_map'
+    params:
+        mapDir = outDir + 'HaplotypeCaller/DBImport/'
     benchmark:
         'run_times/create_cohort_map_file.tsv'
     shell:
-        'n=({input}); for i in ${{n[@]}}; do cat $i >> {output}; done'
+        'for i in {params.mapDir}*.map; do cat $i >> {output}; done'
 
 rule HC_consolidate_gvcfs:
     '''Split samples by chromosome
