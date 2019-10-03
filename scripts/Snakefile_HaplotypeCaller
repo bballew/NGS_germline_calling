@@ -171,7 +171,7 @@ rule HC_consolidate_gvcfs:
     benchmark:
         'run_times/HC_consolidate_gvcfs/{chrom}.tsv'
     shell:
-        'mkdir -p {output.t} || die "ERROR making temp dir"; rm -r {params.db}; {params.e}gatk --java-options "-Xmx4G" GenomicsDBImport \
+        'mkdir -p {output.t} || die "ERROR making temp dir"; rm -r {params.db}; {params.e}gatk --java-options "-Xmx20G" GenomicsDBImport \
             --sample-name-map {input.sampleMap} \
             --genomicsdb-workspace-path {params.db} \
             -L {params.interval} \
