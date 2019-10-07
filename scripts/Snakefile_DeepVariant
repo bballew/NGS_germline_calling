@@ -193,17 +193,32 @@ rule DV_concat_gvcfs:
         'source /etc/profile.d/modules.sh; module load bcftools;'
         'mkdir -p {params}; bcftools concat -Ou -a {input.vcf} | bcftools sort -T {params} -Ov -o {output.vcf}' # sort -k1,1 -k2,2n > {output}'
 
-rule DV_create_manifest:
+rule DV_create_each_sample_manifest:
     '''Create list of files for GLnexus to merge
+    Needed to break up into two steps (individual manifest,
+    then merging to cohort manifest) to work around command 
+    line character limits when run at scale.
     '''
     input:
-        expand(outDir + 'deepVariant/called/gvcfs/{sample}_all_chroms.g.vcf', sample=sampleList)
+        outDir + 'deepVariant/called/gvcfs/{sample}_all_chroms.g.vcf'
+    output:
+        temp('deepVariant/called/gvcfs/{sample}_manifest.txt')
+    benchmark:
+        'run_times/DV_create_sample_manifest/{sample}_manifest.tsv'
+    shell:
+        'echo {input} > {output}'
+
+rule DV_create_cohort_manifest:
+    input:
+        expand('deepVariant/called/gvcfs/{sample}_manifest.txt', sample=sampleList)
     output:
         'deepVariant/called/gvcfs/manifest.txt'
     benchmark:
-        'run_times/DV_create_manifest/manifest.tsv'
+        'run_times/DV_create_cohort_manifest/manifest.tsv'
+    params:
+        manDir = outDir + 'deepVariant/called/gvcfs/'
     shell:
-        'echo {input} | tr " " "\n" > {output}'
+        'for i in {params.manDir}*.txt; do cat $i >> {output}; done'
 
 rule DV_GLmerge_gvcfs:
     '''Merge gvcfs into one multi-sample vcf
