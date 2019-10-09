@@ -51,7 +51,7 @@ rule HC_compress_gvcfs:
     benchmark:
         'run_times/HC_compress_gvcfs/{chrom}_{sample}.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load tabix bgzip;'
+        'source /etc/profile.d/modules.sh; module load tabix/1.9 bgzip/0.2.6;'
         'bgzip {input.gvcf}; tabix -p vcf {input.gvcf}.gz'
 
 rule HC_concat_gvcfs:
@@ -80,7 +80,7 @@ rule HC_index_gvcf:
     benchmark:
         'run_times/HC_index_gvcf/{sample}.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load tabix;'
+        'source /etc/profile.d/modules.sh; module load tabix/1.9;'
         'tabix -p vcf {input}'
 
 rule HC_create_each_sample_map_file:
@@ -103,7 +103,7 @@ rule HC_create_each_sample_map_file:
     benchmark:
         'run_times/create_sample_map/{sample}.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load bcftools;'
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
         'n=$(bcftools query -l {input.gvcf});'
         'echo "${{n}}\t{input.gvcf}" > {output}'
         # 'echo {input.gvcfList} | tr " " "\n" | sed "s///"'
@@ -224,6 +224,6 @@ rule HC_concat_vcfs_bcftools:
     benchmark:
         'run_times/HC_concat_vcfs_bcftools/HC_variants.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load bcftools tabix;'
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9 tabix/1.9;'
         'mkdir -p {params}; bcftools concat -a {input.vcfList} -Ou | bcftools sort -T {params} -Oz -o {output.projectVCF};'
         'tabix -p vcf {output.projectVCF}'

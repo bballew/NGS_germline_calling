@@ -139,7 +139,7 @@ rule DV_index_vcfs:
     benchmark:
         'run_times/DV_index_vcfs/{sample}_{shards}.tsv' if useShards else 'run_times/DV_index_vcfs/{sample}_{chrom}.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load tabix;'
+        'source /etc/profile.d/modules.sh; module load tabix/1.9;'
         'tabix -p vcf {input}'
 
 rule DV_concat_vcfs:
@@ -157,7 +157,7 @@ rule DV_concat_vcfs:
     benchmark:
         'run_times/DV_concat_vcfs/{sample}.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load bcftools;'
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
         'mkdir -p {params}; bcftools concat -Ou -a {input.vcf} | bcftools sort -T {params} -Oz -o {output.gz}' # sort -k1,1 -k2,2n > {output}'
 
 rule DV_index_gvcfs:
@@ -170,7 +170,7 @@ rule DV_index_gvcfs:
     benchmark:
         'run_times/DV_index_gvcfs/{sample}_{shards}.tsv' if useShards else 'run_times/DV_index_gvcfs/{sample}_{chrom}.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load tabix;'
+        'source /etc/profile.d/modules.sh; module load tabix/1.9;'
         'tabix -p vcf {input}'
 
 rule DV_concat_gvcfs:
@@ -190,7 +190,7 @@ rule DV_concat_gvcfs:
     params:
         tempDir + 'DV_concat_gvcfs/{sample}/'
     shell:
-        'source /etc/profile.d/modules.sh; module load bcftools;'
+        'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
         'mkdir -p {params}; bcftools concat -Ou -a {input.vcf} | bcftools sort -T {params} -Ov -o {output.vcf}' # sort -k1,1 -k2,2n > {output}'
 
 rule DV_create_each_sample_manifest:
@@ -248,7 +248,7 @@ rule DV_GLmerge_gvcfs:
     benchmark:
         'run_times/DV_GLmerge_gvcfs/DV_variants.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load glnexus/1.1.5 gcc;'
+        'source /etc/profile.d/modules.sh; module load glnexus/1.1.5 gcc/7.2.0;'
         'glnexus_cli --config DeepVariant --bed {input.b} --list {input.m} > {output}'
 
 rule DV_compress_merged_vcfs:
@@ -262,5 +262,5 @@ rule DV_compress_merged_vcfs:
     benchmark:
         'run_times/DV_compress_merged_vcfs/DV_variants.tsv'
     shell:
-        'source /etc/profile.d/modules.sh; module load tabix bcftools;'
+        'source /etc/profile.d/modules.sh; module load tabix/1.9 bcftools/1.9;'
         'bcftools view {input} | bgzip -c > {output.gz}; tabix -p vcf {output.gz}'
