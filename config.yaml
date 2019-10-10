@@ -5,16 +5,21 @@ outputDir: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/te
 logDir: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/logs/'
 tempDir: '/ttemp/bballew/'
 
-intervalFile: '/DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.intervals'
-bedFile: '/DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.bed'
-
 clusterMode: 'qsub -q xlong.q -V -j y -o /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/test_out/logs/'
 snakePath: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/variantCallingHC4/scripts/'
 
-gatkPath: '/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.11.0/'
-
 refGenome: '/DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/hg19_canonical_correct_chr_order.fa'
+bedFile: '/DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.bed'
 
+runMode:
+  haplotypeCaller: TRUE
+  deepVariant: TRUE
+  harmonize: TRUE  # will only be run if both callers are used
+
+# DeepVariant parameters
 useShards: TRUE  # shards vs. chroms to parallelize
 numShards: 4
 modelPath: '/opt/wes/model.ckpt' # either /opt/wgs/model.ckpt or /opt/wes/model.ckpt for WGS or WES, respectively
+
+# HaplotypeCaller parameters
+gatkPath: '/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.11.0/'

@@ -4,7 +4,6 @@
 '''DeepVariant module of CGR germline variant calling pipeline
 '''
 
-
 rule DV_make_examples:
     '''Generate TF examples for evaluation with DV models
 
@@ -89,6 +88,9 @@ rule DV_call_variants:
     in the DV container.
 
     Intentionally NOT combining shards here to maintain parallelization.
+
+    NOTE: when using by-chrom parallelization, this errors out for chroms
+    that don't have any data (e.g. for my tiny test set).  How to handle?
     '''
     input:
         outDir + 'deepVariant/make_examples/{sample}.examples.tfrecord-{shards}-of-' + maxShards + '.gz' if useShards else outDir + 'deepVariant/make_examples/{chrom}part_{sample}.examples.tfrecord.gz'

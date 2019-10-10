@@ -30,24 +30,29 @@ conf = os.environ.get("conf")
 configfile: conf
 
 # import variables from the config file
+hc_mode = config['runMode']['haplotypeCaller']
+dv_mode = config['runMode']['deepVariant']
+har_mode = config['runMode']['harmonize']
 refGenome = config['refGenome']
-gatkPath = config['gatkPath'].rstrip('/') + '/'  # ensure one trailing slash
 snakePath = config['snakePath'].rstrip('/') + '/'
-intervalFile = config['intervalFile']
 bedFile = config['bedFile']
+if hc_mode:
+    gatkPath = config['gatkPath'].rstrip('/') + '/'  # ensure one trailing slash
+if dv_mode:
+    modelPath = config['modelPath']
+    useShards = config['useShards']
+    if useShards:
+        numShards = config['numShards']
+        maxShards = "{:05d}".format(numShards)
+        s = list(range(numShards))
+        shardsList = ["%05d" % n for n in s]
 outDir = config['outputDir'].rstrip('/') + '/'
 inDir = config['inputDir'].rstrip('/') + '/'
-tempDir=config['tempDir'].rstrip('/') + '/'
+tempDir = config['tempDir'].rstrip('/') + '/'
 logDir = config['logDir'].rstrip('/') + '/'
-modelPath = config['modelPath']
-useShards = config['useShards']
-if useShards:
-    numShards = config['numShards']
-    maxShards = "{:05d}".format(numShards)
-    s = list(range(numShards))
-    shardsList = ["%05d" % n for n in s]
 
-CALLERS = ['HC','DV']
+
+CALLERS = ['HC', 'DV']  # used in harmonize module
 
 # derive additional refgenome variables
 refFile = os.path.basename(refGenome)
@@ -75,7 +80,9 @@ with open(dictionaryFile) as f:
     for line in f:
         f1 = line.split("\t")[1]
         f2 = f1.split(":")[1]
-        if not subprocess.call(['grep', '-q', '^' + f2 + ':', intervalFile]): # exclude chroms not in the regions of interest, otherwise creates an empty interval file which GATK doesn't like
+        # if hc_mode and not subprocess.call(['grep', '-q', '^' + f2 + ':', intervalFile]): # exclude chroms not in the regions of interest, otherwise creates an empty interval file which GATK doesn't like
+        #     chromList.append(f2)
+        if not subprocess.call(['grep', '-q', '^' + f2 + '\\s', bedFile]):
             chromList.append(f2)
 
 def get_DBImport_path1(wildcards):
@@ -92,14 +99,41 @@ def get_DBImport_path2(wildcards):
 report: 'report/workflow.rst'
 
 
-rule all:
-    input:
-        # outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi',
-        expand(outDir + 'deepVariant/called/vcfs/{sample}_all_chroms.vcf.gz', sample=sampleList),
-        # outDir + 'deepVariant/genotyped/DV_variants.vcf.gz.tbi',
-        outDir + 'ensemble/all_callers_merged_genotypes.vcf.gz.tbi'
+# rule all:
+#     input:
+#         # outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz.tbi',
+#         expand(outDir + 'deepVariant/called/vcfs/{sample}_all_chroms.vcf.gz', sample=sampleList),
+#         # outDir + 'deepVariant/genotyped/DV_variants.vcf.gz.tbi',
+#         outDir + 'ensemble/all_callers_merged_genotypes.vcf.gz.tbi'
 
-        # if we want to allow options for calling without combining/harmonizing, will need conditional inputs here and below at include statements
+if hc_mode and not dv_mode:
+    include: 'Snakefile_HaplotypeCaller'
+    rule all:
+        input:
+            outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz'
+if dv_mode and not hc_mode:
+    include: 'Snakefile_DeepVariant'
+    rule all:
+        input:
+            expand(outDir + 'deepVariant/called/vcfs/{sample}_all_chroms.vcf.gz', sample=sampleList),
+            outDir + 'deepVariant/genotyped/DV_variants.vcf.gz'
+if hc_mode and dv_mode and not har_mode:
+    include: 'Snakefile_HaplotypeCaller'
+    include: 'Snakefile_DeepVariant'
+    rule all:
+        input:
+            outDir + 'HaplotypeCaller/genotyped/combined/HC_variants.vcf.gz',
+            expand(outDir + 'deepVariant/called/vcfs/{sample}_all_chroms.vcf.gz', sample=sampleList),
+            outDir + 'deepVariant/genotyped/DV_variants.vcf.gz'
+if hc_mode and dv_mode and har_mode:
+    include: 'Snakefile_HaplotypeCaller'
+    include: 'Snakefile_DeepVariant'
+    include: 'Snakefile_harmonize'
+    rule all:
+        input:
+            expand(outDir + 'deepVariant/called/vcfs/{sample}_all_chroms.vcf.gz', sample=sampleList),
+            outDir + 'ensemble/all_callers_merged_genotypes.vcf.gz.tbi'
+
 
 rule split_bed_file:
     '''Separates bed regions by chromosome.
@@ -125,23 +159,11 @@ rule split_bed_file:
     don't love the || true solution; what will it do for exit > 1?
     '''
     input:
-        bed = bedFile,
-        interval = intervalFile
+        bed = bedFile
     output:
-        bed = outDir + 'split_regions/{chrom}.bed',
-        interval = outDir + 'split_regions/{chrom}.intervals'
+        bed = outDir + 'split_regions/{chrom}.bed'
     benchmark:
         'run_times/split_bed_file/{chrom}.tsv'
     shell:
-        'grep "^{wildcards.chrom}[[:space:]]" {input.bed} > {output.bed} || true;'
-        'grep "^{wildcards.chrom}:" {input.interval} > {output.interval} || true'
+        'grep "^{wildcards.chrom}[[:space:]]" {input.bed} > {output.bed} || true'
         #'grep -m1 {wildcards.chrom} {input}; if [ $? -lt 2 ]; then grep {wildcards.chrom} {input} > {output}; fi'
-
-
-include: 'Snakefile_HaplotypeCaller'
-include: 'Snakefile_DeepVariant'
-include: 'Snakefile_harmonize'
-
-
-
-

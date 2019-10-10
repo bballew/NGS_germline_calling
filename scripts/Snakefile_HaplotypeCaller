@@ -4,7 +4,6 @@
 '''HaplotyeCaller module of CGR germline variant calling pipeline
 '''
 
-
 rule HC_call_variants:
     '''Call gVCFs with GATK4
     Runs over each chrom in parallel.
@@ -18,7 +17,7 @@ rule HC_call_variants:
         i5 = refGenome + '.sa',
         i6 = refGenome + '.fai',
         i7 = dictionaryFile,
-        interval = outDir + 'split_regions/{chrom}.intervals',
+        bed = outDir + 'split_regions/{chrom}.bed',
         bam = inDir + '{sample}.bam',
         bai = inDir + '{sample}.bam.bai'
     output:
@@ -33,7 +32,7 @@ rule HC_call_variants:
             -R {input.ref} \
             -I {input.bam} \
             -ERC GVCF \
-            -L {input.interval} \
+            -L {input.bed} \
             -O {output.gvcf} \
             -new-qual \
             -G StandardAnnotation \
@@ -106,7 +105,6 @@ rule HC_create_each_sample_map_file:
         'source /etc/profile.d/modules.sh; module load bcftools/1.9;'
         'n=$(bcftools query -l {input.gvcf});'
         'echo "${{n}}\t{input.gvcf}" > {output}'
-        # 'echo {input.gvcfList} | tr " " "\n" | sed "s///"'
 
 rule HC_create_cohort_map_file:
     input:
@@ -182,7 +180,7 @@ rule HC_genotype_gvcfs:
     '''
     input:
         ref = refGenome,
-        interval = intervalFile,
+        bed = bedFile,
         o1 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/vcfheader.vcf',
         o2 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/vidmap.json',
         o3 = outDir + 'HaplotypeCaller/DBImport/' + dt + '_{chrom}/callset.json',
