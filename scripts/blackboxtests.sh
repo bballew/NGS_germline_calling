@@ -4,40 +4,79 @@
 
 DATE=$(date +"%Y%m%d%H%M")
 myInPath="/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/data/"
-myOutPath="/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out_${DATE}/"
-myTempPath="/ttemp/bballew/${DATE}/"
+myOutPath="/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/out_${DATE}"
+myTempPath="/ttemp/bballew/${DATE}"
 
-if [ ! -d "$myOutPath" ]; then
-    mkdir -p "$myOutPath" || die "mkdir ${myOutPath} failed"
-else
-    echo "${myOutPath} already exists!"
-fi
+MODES=("DV_HC_Har" "DV_HC" "DV" "HC" "DV_by_chrom")
 
-# if [ ! -d "$myTempPath" ]; then
-#     mkdir -p "$myTempPath" || die "mkdir ${myTempPath} failed"
-# fi
+# create config and directories for five different run modes
+for i in "${MODES[@]}"
+do
 
+    outPath="${myOutPath}_${i}/"
+    tempPath="${myTempPath}_${i}"
 
-# generate a test config:
-echo "maxJobs: 100" > ${myOutPath}/TESTconfig.yaml
-echo "inputDir: '${myInPath}'" >> ${myOutPath}/TESTconfig.yaml
-echo "outputDir: '${myOutPath}'" >> ${myOutPath}/TESTconfig.yaml
-echo "logDir: '${myOutPath}/logs/'" >> ${myOutPath}/TESTconfig.yaml
-echo "tempDir: '${myTempPath}'" >> ${myOutPath}/TESTconfig.yaml
-echo "intervalFile: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/regions/seqcap_EZ_Exome_v3_v3utr_intersect_correct_NOchr4.intervals'" >> ${myOutPath}/TESTconfig.yaml
-echo "bedFile: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/regions/seqcap_EZ_Exome_v3_v3utr_intersect_correct_NOchr4.bed'" >> ${myOutPath}/TESTconfig.yaml
-echo "clusterMode: 'qsub -q long.q -V -j y -o ${myOutPath}/logs/'" >> ${myOutPath}/TESTconfig.yaml
-echo "snakePath: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/scripts/'" >> ${myOutPath}/TESTconfig.yaml
-echo "gatkPath: '/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.11.0/'" >> ${myOutPath}/TESTconfig.yaml
-echo "refGenome: '/DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/hg19_canonical_correct_chr_order.fa'" >> ${myOutPath}/TESTconfig.yaml
-echo "useShards: TRUE  # shards vs. chroms to parallelize" >> ${myOutPath}/TESTconfig.yaml
-echo "numShards: 4" >> ${myOutPath}/TESTconfig.yaml
-echo "modelPath: '/opt/wes/model.ckpt' # either /opt/wgs/model.ckpt or /opt/wes/model.ckpt for WGS or WES, respectively" >> ${myOutPath}/TESTconfig.yaml
+    if [ ! -d "$outPath" ]; then
+        mkdir -p "$outPath" || die "mkdir ${outPath} failed"
+    else
+        echo "${outPath} already exists!"
+    fi
 
+    # generate a test config:
+    echo "maxJobs: 100" > ${outPath}/TESTconfig.yaml
+    echo "inputDir: '${myInPath}'" >> ${outPath}/TESTconfig.yaml
+    echo "outputDir: '${outPath}'" >> ${outPath}/TESTconfig.yaml
+    echo "logDir: '${outPath}/logs/'" >> ${outPath}/TESTconfig.yaml
+    echo "tempDir: '${tempPath}'" >> ${outPath}/TESTconfig.yaml
+    echo "bedFile: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/tests/regions/seqcap_EZ_Exome_v3_v3utr_intersect_correct_NOchr4.bed'" >> ${outPath}/TESTconfig.yaml
+    echo "clusterMode: 'qsub -q long.q -V -j y -o ${outPath}/logs/'" >> ${outPath}/TESTconfig.yaml
+    echo "snakePath: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/scripts/'" >> ${outPath}/TESTconfig.yaml
+    echo "gatkPath: '/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.11.0/'" >> ${outPath}/TESTconfig.yaml
+    echo "refGenome: '/DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/hg19_canonical_correct_chr_order.fa'" >> ${outPath}/TESTconfig.yaml
+    echo "numShards: 4" >> ${outPath}/TESTconfig.yaml
+    echo "modelPath: '/opt/wes/model.ckpt' # either /opt/wgs/model.ckpt or /opt/wes/model.ckpt for WGS or WES, respectively" >> ${outPath}/TESTconfig.yaml
+    echo "runMode: " >> ${outPath}/TESTconfig.yaml
+
+done
+
+# DV, HC, and harmonization modules
+echo "  haplotypeCaller: TRUE"  >> ${myOutPath}_DV_HC_Har/TESTconfig.yaml
+echo "  deepVariant: TRUE"  >> ${myOutPath}_DV_HC_Har/TESTconfig.yaml
+echo "  harmonize: TRUE"  >> ${myOutPath}_DV_HC_Har/TESTconfig.yaml
+echo "useShards: TRUE" >> ${myOutPath}_DV_HC_Har/TESTconfig.yaml
+
+# DV and HC, no harmonization
+echo "  haplotypeCaller: TRUE"  >> ${myOutPath}_DV_HC/TESTconfig.yaml
+echo "  deepVariant: TRUE"  >> ${myOutPath}_DV_HC/TESTconfig.yaml
+echo "  harmonize: FALSE"  >> ${myOutPath}_DV_HC/TESTconfig.yaml
+echo "useShards: TRUE" >> ${myOutPath}_DV_HC/TESTconfig.yaml
+
+# DV only
+echo "  haplotypeCaller: FALSE"  >> ${myOutPath}_DV/TESTconfig.yaml
+echo "  deepVariant: TRUE"  >> ${myOutPath}_DV/TESTconfig.yaml
+echo "  harmonize: FALSE"  >> ${myOutPath}_DV/TESTconfig.yaml
+echo "useShards: TRUE" >> ${myOutPath}_DV/TESTconfig.yaml
+
+# HC only
+echo "  haplotypeCaller: TRUE"  >> ${myOutPath}_HC/TESTconfig.yaml
+echo "  deepVariant: FALSE"  >> ${myOutPath}_HC/TESTconfig.yaml
+echo "  harmonize: FALSE"  >> ${myOutPath}_HC/TESTconfig.yaml
+echo "useShards: TRUE" >> ${myOutPath}_HC/TESTconfig.yaml
+
+# DV only, parallelize by chromosome (others are by shard)
+echo "  haplotypeCaller: FALSE"  >> ${myOutPath}_DV_by_chrom/TESTconfig.yaml
+echo "  deepVariant: TRUE"  >> ${myOutPath}_DV_by_chrom/TESTconfig.yaml
+echo "  harmonize: FALSE"  >> ${myOutPath}_DV_by_chrom/TESTconfig.yaml
+echo "useShards: FALSE" >> ${myOutPath}_DV_by_chrom/TESTconfig.yaml
 
 
 module load python3/3.6.3 sge
 unset module
-cmd="qsub -q long.q -V -j y -S /bin/sh -o ${myOutPath} /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/scripts/submit.sh ${myOutPath}/TESTconfig.yaml"
-echo "Command run: $cmd"
-eval $cmd
+
+for i in "${MODES[@]}"
+do
+    outPath="${myOutPath}_${i}/"
+    cmd="qsub -q long.q -V -j y -S /bin/sh -o ${outPath} /DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/scripts/submit.sh ${outPath}/TESTconfig.yaml"
+    echo "Command run: $cmd"
+    eval $cmd
+done
