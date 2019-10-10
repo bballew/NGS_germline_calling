@@ -11,9 +11,10 @@ __Input:__
 - Edited `config.yaml` file
 
 __Output:__
-- Multi-sample VCF called with DeepVariant
-- Multi-sample VCF called with HaplotypeCaller
-- Multi-sample VCF containing the union of the DeepVariant and HaplotypeCaller calls
+- Depends on run mode selected in the config, but can include:
+  - Multi-sample VCF called with DeepVariant
+  - Multi-sample VCF called with HaplotypeCaller
+  - Multi-sample VCF containing the union of the DeepVariant and HaplotypeCaller calls
 
 ## How to run:
 
@@ -30,14 +31,51 @@ __Output:__
   - `local` to run the pipeline on a single machine
   - `unlock` to unlock the working directory (may be needed if snakemake exited unexpectedly - see snakemake docs for details)
 - `useShards` is a boolean to allow parallelization of DeepVariant over shards (e.g. if numShards=10, then each "shard" will contain 10% of the data) or over chromosomes
+  - For targeted analyses that only cover a subset of chromosomes, use `useShards: TRUE`.  Using by-chromosome parallelization will result in empty datasets which will cause errors during calling with DeepVariant.
 - `modelPath` has two options provided by DeepVariant, /opt/wgs/model.ckpt or /opt/wes/model.ckpt for WGS or WES, respectively
 
-## How to perform black box testing to identify regressions
+
+__Run modes:__
+- HaplotypeCaller only
+- DeepVariant only
+- Both callers, no harmonized output
+- Both callers plus harmonized output
+- Harmonized output only - CURRENTLY UNTESTED - only applicable to caller output/directory structure as would be created by the calling modules of this pipeline
+- Set the run mode for a given pipeline execution in the config as follows:
+  - Example: DeepVariant only
+
+      runMode:
+        haplotypeCaller: FALSE
+        deepVariant: TRUE
+        harmonize: FALSE
+
+  - Example: Both callers plus harmonized output
+
+      runMode:
+        haplotypeCaller: TRUE
+        deepVariant: TRUE
+        harmonize: TRUE
+
+
+## How to perform black box testing to identify regressions and confirm expected output
 
 - Open `scripts/blackboxtests.sh` and edit `myInPath` and `myOutPath` if necessary
 - Run via `bash scripts/blackboxtests.sh`
-- Upon completion, run `bash scripts/blackboxdiffs.sh <datestamp>`, where `<datestamp>` is the date appended to the test run's `tests/out_<datestamp>` directory
-- Look for PASS/ERROR status of each test (printed to stdout and saved to a file `tests/out_<datestamp>/diff_tests.txt`
+  - This will create config files and execute five independent pipeline runs, one in each of the following run modes:
+    - HaplotypeCaller only, output to `tests/out_<datestamp>_HC`
+    - DeepVariant only, output to `tests/out_<datestamp>_DV`
+    - Both callers, no harmonized output, output to `tests/out_<datestamp>_DV_HC`
+    - Both callers plus harmonized output, output to `tests/out_<datestamp>_DV_HC_Har`
+    - DeepVariant only, using by-chrom parallelization, output to `tests/out_<datestamp>_DV_by_chrom`
+- Upon completion, run `bash scripts/blackboxdiffs.sh <datestamp>`, where `<datestamp>` is the date appended to the test run's `tests/out_<datestamp>_*` directory
+- Look for PASS/ERROR status of each test (printed to stdout and saved to a file `tests/out_<datestamp>_*/diff_tests.txt`
+  - NOTE: The DV_by_chrom test will fail, because DeepVariant errors out when there is no data for a given chromosome.  Consider using an alternative input dataset for this test.
+
+
+
+
+
+
 
 ------------------------------------------------
 
