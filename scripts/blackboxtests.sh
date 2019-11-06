@@ -5,7 +5,7 @@
 DATE=$(date +"%Y%m%d%H%M")
 myExecPath="/DCEG/CGF/Bioinformatics/Production/Bari/germlineCallingV4/"
 # myInPath="/DCEG/CGF/Bioinformatics/Production/Bari/germlineCallingV4/tests/data/"
-myOutPath="${myExecPath}tests/out_${DATE}"
+myOutPath="${myExecPath}/tests/out_${DATE}"
 myTempPath="/ttemp/bballew/${DATE}"
 
 MODES=("DV_HC_Har" "DV_HC" "DV" "HC" "DV_by_chrom")
@@ -25,13 +25,13 @@ do
 
     # generate a test config:
     echo "maxJobs: 100" > ${outPath}/TESTconfig.yaml
-    echo "inputDir: '${myExecPath}tests/data/'" >> ${outPath}/TESTconfig.yaml
+    echo "inputDir: '${myExecPath}/tests/data/'" >> ${outPath}/TESTconfig.yaml
     echo "outputDir: '${outPath}'" >> ${outPath}/TESTconfig.yaml
     echo "logDir: '${outPath}/logs/'" >> ${outPath}/TESTconfig.yaml
     echo "tempDir: '${tempPath}'" >> ${outPath}/TESTconfig.yaml
-    echo "bedFile: '${myExecPath}tests/regions/seqcap_EZ_Exome_v3_v3utr_intersect_correct_NOchr4.bed'" >> ${outPath}/TESTconfig.yaml
+    echo "bedFile: '${myExecPath}/tests/regions/seqcap_EZ_Exome_v3_v3utr_intersect_correct_NOchr4.bed'" >> ${outPath}/TESTconfig.yaml
     echo "clusterMode: 'qsub -q long.q -V -j y -o ${outPath}/logs/'" >> ${outPath}/TESTconfig.yaml
-    echo "snakePath: '/DCEG/CGF/Bioinformatics/Production/Bari/Germline_pipeline_v4_dev/germlineCallingV4/scripts/'" >> ${outPath}/TESTconfig.yaml
+    echo "snakePath: '${myExecPath}/scripts/'" >> ${outPath}/TESTconfig.yaml
     echo "gatkPath: '/DCEG/Projects/Exome/SequencingData/GATK_binaries/gatk-4.0.11.0/'" >> ${outPath}/TESTconfig.yaml
     echo "refGenome: '/DCEG/CGF/Bioinformatics/Production/Bari/refGenomes/hg19_canonical_correct_chr_order.fa'" >> ${outPath}/TESTconfig.yaml
     echo "numShards: 4" >> ${outPath}/TESTconfig.yaml
@@ -77,7 +77,7 @@ unset module
 for i in "${MODES[@]}"
 do
     outPath="${myOutPath}_${i}/"
-    cmd="qsub -q long.q -V -j y -S /bin/sh -o ${outPath} ${myExecPath}scripts/submit.sh ${outPath}/TESTconfig.yaml"
+    cmd="qsub -q long.q -V -j y -S /bin/sh -o ${outPath} ${myExecPath}/scripts/submit.sh ${outPath}/TESTconfig.yaml"
     echo "Command run: $cmd"
     eval $cmd
 done
